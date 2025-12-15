@@ -56,8 +56,8 @@ class OrbChain:
             num_orbs = min(5 + self.level, 12)  # Cap initial orbs
             
         for i in range(num_orbs):
-            distance = -i * self.distance_between_orbs - 200
-            # No powerups in initial spawn to prevent instant chaos
+            # Spawn from the back (negative distance) - start VERY far back
+            distance = -i * self.distance_between_orbs - 200  # Start even further back!
             orb_type = Orb.random_type()
             self.add_orb_at_distance(orb_type, distance)
             
@@ -70,8 +70,7 @@ class OrbChain:
             orb = Orb(pos.x(), pos.y(), orb_type)
             orb.path_distance = distance
             
-            # Insert orb in correct position based on distance (sorted by distance)
-            # Lower distance = back of chain, higher distance = front of chain
+            # Insert orb in correct sorted position
             inserted = False
             for i, existing_orb in enumerate(self.orbs):
                 if distance < existing_orb.path_distance:
@@ -80,8 +79,10 @@ class OrbChain:
                     break
             
             if not inserted:
-                # Orb has highest distance, add to end (front of chain)
                 self.orbs.append(orb)
+            
+            # Immediately fix any spacing issues
+            self._maintain_spacing()
             
     def insert_orb(self, orb, index):
         """Insert orb into chain at specific index"""
@@ -110,20 +111,20 @@ class OrbChain:
                 self.frozen = False
             return
             
-        # Move all orbs forward
-        for i, orb in enumerate(self.orbs):
+        # Move all orbs forward along the path
+        for orb in self.orbs:
             orb.path_distance += self.speed * dt
             
-            # Update position based on path
+            # Update visual position based on path
             pos = self.path.get_position_at_distance(orb.path_distance)
             if pos:
                 orb.pos = pos
                 
             orb.update(dt)
         
-        # INSTANT PULL TOGETHER - No delay when gap exists
-        self._pull_together_instantly()
-            
+        # Maintain proper spacing between orbs
+        self._maintain_spacing()
+        
         # Spawn new orbs at the BACK of the chain only
         self.spawn_timer += dt
         
@@ -144,46 +145,75 @@ class OrbChain:
             else:
                 new_distance = -self.distance_between_orbs
             
-            # --- PERBAIKAN: Chance to spawn PowerUp ---
-            import random
-            # 5% chance for powerup, but not in level 1
-            if self.level > 1 and random.random() < 0.05:
-                orb_type = Orb.random_powerup()
-                print(f"Chain: Spawning POWERUP: {orb_type}")
-            else:
-                orb_type = Orb.random_type()
-                
+            orb_type = Orb.random_type()
             self.add_orb_at_distance(orb_type, new_distance)
             self.orbs_spawned += 1
+            
+            print(f"Chain: Spawned orb {self.orbs_spawned}/{self.max_total_orbs}")
+            
+        # Remove marked orbs
+        removed_count = len([orb for orb in self.orbs if orb.marked_for_removal])
+        if removed_count > 0:
+            print(f"Chain: Removing {removed_count} exploded orbs")
+            
+        self.orbs = [orb for orb in self.orbs if not orb.marked_for_removal]
+        
+        # Log status for debugging
+        if len(self.orbs) <= 3:
+            print(f"Chain: Only {len(self.orbs)} orbs left! Spawned: {self.orbs_spawned}/{self.max_total_orbs}")
     
-    def _pull_together_instantly(self):
-        """Pull orbs together instantly when there's a gap - NO DELAY"""
+    def _maintain_spacing(self):
+        """Maintain proper spacing between all orbs"""
         if len(self.orbs) <= 1:
             return
         
-        # Pull speed - VERY FAST to close gaps immediately
-        pull_speed = self.speed * 3  # 3x faster than normal movement
+        # Sort orbs by distance (back to front)
+        self.orbs.sort(key=lambda o: o.path_distance)
         
-        for i in range(len(self.orbs) - 1):
-            orb1 = self.orbs[i]
-            orb2 = self.orbs[i + 1]
+        # Two-pass system: first ensure minimum spacing, then close gaps
+        
+        # Pass 1: Ensure minimum spacing (prevent overlap)
+        for i in range(1, len(self.orbs)):
+            prev_orb = self.orbs[i - 1]
+            current_orb = self.orbs[i]
             
-            # Calculate distance between orbs
-            distance_between = orb2.path_distance - orb1.path_distance
+            # Calculate required minimum distance
+            min_distance = prev_orb.path_distance + self.distance_between_orbs
             
-            # If gap is too large, pull orb2 backward INSTANTLY
-            if distance_between > self.distance_between_orbs + 2:
-                # Calculate how much to pull
-                excess_gap = distance_between - self.distance_between_orbs
-                pull_amount = min(excess_gap, pull_speed)
+            # If too close, push current orb forward
+            if current_orb.path_distance < min_distance:
+                current_orb.path_distance = min_distance
                 
-                # Pull orb2 backward
-                orb2.path_distance -= pull_amount
-                
-                # Update visual position immediately
-                pos = self.path.get_position_at_distance(orb2.path_distance)
+                # Update visual position
+                pos = self.path.get_position_at_distance(current_orb.path_distance)
                 if pos:
-                    orb2.pos = pos
+                    current_orb.pos = pos
+        
+        # Pass 2: Close large gaps (pull orbs together smoothly)
+        for i in range(len(self.orbs) - 1, 0, -1):  # Iterate backwards
+            prev_orb = self.orbs[i - 1]
+            current_orb = self.orbs[i]
+            
+            # Calculate actual distance
+            actual_distance = current_orb.path_distance - prev_orb.path_distance
+            
+            # If gap is too large, pull current orb backward
+            max_distance = self.distance_between_orbs + 5  # Allow small gap
+            if actual_distance > max_distance:
+                # Pull backward gradually (not instant to avoid visual glitch)
+                pull_amount = (actual_distance - self.distance_between_orbs) * 0.5
+                current_orb.path_distance -= pull_amount
+                
+                # Update visual position
+                pos = self.path.get_position_at_distance(current_orb.path_distance)
+                if pos:
+                    current_orb.pos = pos
+    
+    def _pull_together_instantly(self):
+        """Pull orbs together instantly when there's a gap - REMOVED"""
+        # This function caused the stacking issue, so it's now empty
+        # Spacing is handled by _maintain_spacing instead
+        pass
         
     def check_matches(self):
         """Check for matching orb sequences"""
@@ -219,6 +249,9 @@ class OrbChain:
         for idx in sorted(indices, reverse=True):
             if 0 <= idx < len(self.orbs):
                 self.orbs[idx].explode()
+        
+        # After marking for removal, the update loop will clean them up
+        # and _maintain_spacing will fix any gaps
                 
     def freeze(self, duration):
         """Freeze chain movement"""
