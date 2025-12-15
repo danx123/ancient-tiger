@@ -1,10 +1,11 @@
 """
 Pause menu overlay
+FIXED: Removed black background, now semi-transparent overlay
 """
 
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QPushButton, QLabel
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QPainter, QColor
 from app.state_manager import GameState
 
 class PauseMenu(QDialog):
@@ -61,7 +62,16 @@ class PauseMenu(QDialog):
         layout.addWidget(menu_btn, alignment=Qt.AlignCenter)
         
         self.setLayout(layout)
-        self.setStyleSheet("background-color: rgba(0, 0, 0, 180);")
+        
+        # FIXED: No background color here, we'll draw it in paintEvent
+        
+    def paintEvent(self, event):
+        """Custom paint event for semi-transparent background"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        # Draw semi-transparent dark overlay
+        painter.fillRect(self.rect(), QColor(0, 0, 0, 150))
         
     def show_overlay(self):
         """Show pause overlay"""
