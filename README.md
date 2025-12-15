@@ -1,7 +1,9 @@
-# 🐯 Ancient Tiger - Temple of the Orbs
+# 🐯 Ancient Tiger - The Black Hole Escape
 
 <div align="center">
-<img width="1365" height="767" alt="Screenshot 2025-12-15 092929" src="https://github.com/user-attachments/assets/9c7d6c50-874e-42f9-862c-e0c7fc161a6f" />
+<img width="2044" height="1150" alt="ancient-tiger" src="https://github.com/user-attachments/assets/10f7702d-750f-4ae9-a7ea-1b36b6dd93c2" />
+
+
 
 
 
