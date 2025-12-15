@@ -1,5 +1,6 @@
 """
 Main application window managing all screens and game states
+FIXED: Proper pause/resume handling
 """
 import os
 import sys
@@ -55,10 +56,21 @@ class AppWindow(QMainWindow):
         
     def on_state_changed(self, state):
         """Handle state transitions"""
+        print(f"AppWindow: State changed to {state}")
+        
         if state == GameState.MAIN_MENU:
             self.show_main_menu()
         elif state == GameState.PLAYING:
-            self.start_game()
+            # Check if resuming from pause
+            if self.state_manager.previous_state == GameState.PAUSED:
+                # Just resume, don't restart
+                if self.game_scene:
+                    self.game_scene.resume_game()
+                    if self.pause_menu:
+                        self.pause_menu.hide_overlay()
+            else:
+                # Starting new game
+                self.start_game()
         elif state == GameState.PAUSED:
             self.show_pause_menu()
         elif state == GameState.GAME_OVER:
@@ -101,14 +113,17 @@ class AppWindow(QMainWindow):
         """Handle global key events"""
         if event.key() == Qt.Key_Escape:
             current_state = self.state_manager.current_state
+            
             if current_state == GameState.PLAYING:
+                # Pause the game
+                print("AppWindow: ESC pressed - Pausing game")
                 self.state_manager.change_state(GameState.PAUSED)
+                
             elif current_state == GameState.PAUSED:
+                # Resume the game
+                print("AppWindow: ESC pressed - Resuming game")
                 self.state_manager.change_state(GameState.PLAYING)
-                if self.game_scene:
-                    self.game_scene.resume_game()
-                if self.pause_menu:
-                    self.pause_menu.hide_overlay()
+                
         elif event.key() == Qt.Key_F11:
             # Toggle fullscreen with F11
             if self.isFullScreen():
@@ -123,6 +138,5 @@ class AppWindow(QMainWindow):
     def closeEvent(self, event):
         """Handle window close - save settings"""
         print("AppWindow: Closing, saving settings...")
-        # Settings are already saved when changed, but just in case
         self.game_manager.settings_manager.save_settings()
         event.accept()
