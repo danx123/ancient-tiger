@@ -1,10 +1,11 @@
 """
-Game settings management
+Game settings management using JSON in Local AppData
 """
 
 import json
-from pathlib import Path
 import os
+import sys
+from pathlib import Path
 
 class SettingsManager:
     """Manages game settings"""
@@ -20,26 +21,44 @@ class SettingsManager:
             'sfx_enabled': True,
             'sfx_volume': 0.8,
             'fullscreen': False,
-            'show_fps': False
+            'show_fps': False,
+            'high_score': 0
         }
         
         # Ensure directory exists
-        self.settings_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.settings_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            print(f"SettingsManager: Error creating directory {e}")
         
         # Load settings
         self.load_settings()
         
     def _get_settings_directory(self):
-        """Get platform-specific settings directory"""
-        if os.name == 'nt':  # Windows
-            appdata = os.getenv('APPDATA')
-            if appdata:
-                return Path(appdata) / "MacanAncient"
+        """Get platform-specific local settings directory (Same as SaveManager)"""
+        app_name = "MacanAncient"
         
-        return Path.home() / ".macanancient"
+        if os.name == 'nt':  # Windows
+            local_app_data = os.getenv('LOCALAPPDATA')
+            if local_app_data:
+                return Path(local_app_data) / app_name
+            app_data = os.getenv('APPDATA')
+            if app_data:
+                return Path(app_data) / app_name
+        
+        home = Path.home()
+        xdg_data = os.getenv('XDG_DATA_HOME')
+        
+        if xdg_data:
+            return Path(xdg_data) / app_name
+            
+        if sys.platform == 'darwin':
+            return home / "Library" / "Application Support" / app_name
+            
+        return home / ".local" / "share" / app_name
         
     def save_settings(self):
-        """Save settings to file"""
+        """Save settings to JSON file"""
         try:
             with open(self.settings_file, 'w') as f:
                 json.dump(self.settings, f, indent=4)
@@ -49,7 +68,7 @@ class SettingsManager:
             return False
             
     def load_settings(self):
-        """Load settings from file"""
+        """Load settings from JSON file"""
         try:
             if self.settings_file.exists():
                 with open(self.settings_file, 'r') as f:
@@ -59,10 +78,8 @@ class SettingsManager:
             print(f"Error loading settings: {e}")
             
     def get(self, key, default=None):
-        """Get setting value"""
         return self.settings.get(key, default)
         
     def set(self, key, value):
-        """Set setting value"""
         self.settings[key] = value
         self.save_settings()
