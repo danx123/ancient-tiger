@@ -1,5 +1,6 @@
 """
 Orb entity with procedural rendering and physics
+FIXED: Added visible_scale for black hole effect
 """
 
 from PySide6.QtCore import QPointF, QRectF, Qt
@@ -53,8 +54,11 @@ class Orb:
     def __init__(self, x, y, orb_type, radius=15):
         self.pos = QPointF(x, y)
         self.orb_type = orb_type
-        self.radius = radius
+        self.radius = radius # Hitbox radius (tetap)
         self.velocity = QPointF(0, 0)
+        
+        # Visual scaling (untuk efek black hole)
+        self.visible_scale = 1.0 
         
         # Animation
         self.pulse = 0
@@ -86,11 +90,17 @@ class Orb:
             self._draw_explosion(painter)
             return
             
-        # Pulsing effect
+        # Pulsing effect factored by visible_scale
         pulse_amount = 3 if self.is_powerup() else 2
         pulse_offset = math.sin(self.pulse) * pulse_amount
-        current_radius = self.radius + pulse_offset
         
+        # Hitung radius visual (bisa mengecil)
+        current_radius = (self.radius + pulse_offset) * self.visible_scale
+        
+        # Jika scale terlalu kecil, jangan gambar detail
+        if self.visible_scale < 0.1:
+            return
+
         # --- Draw PowerUp Glow ---
         if self.is_powerup():
             glow_gradient = QRadialGradient(self.pos, current_radius * 2.0)
@@ -150,22 +160,24 @@ class Orb:
             symbol = self.POWERUP_SYMBOLS.get(self.orb_type, "?")
             painter.setPen(QColor(255, 255, 255))
             
-            # Use Emoji font if available, fallback to Arial
-            font = QFont("Segoe UI Emoji", int(self.radius)) 
-            if not font.exactMatch():
-                font = QFont("Arial", int(self.radius), QFont.Bold)
-            
-            painter.setFont(font)
-            rect = QRectF(
-                self.pos.x() - self.radius, 
-                self.pos.y() - self.radius, 
-                self.radius * 2, 
-                self.radius * 2
-            )
-            painter.drawText(rect, Qt.AlignCenter, symbol)
+            # Font size scaled
+            font_size = int(self.radius * self.visible_scale)
+            if font_size > 1:
+                font = QFont("Segoe UI Emoji", font_size) 
+                if not font.exactMatch():
+                    font = QFont("Arial", font_size, QFont.Bold)
+                
+                painter.setFont(font)
+                rect = QRectF(
+                    self.pos.x() - current_radius, 
+                    self.pos.y() - current_radius, 
+                    current_radius * 2, 
+                    current_radius * 2
+                )
+                painter.drawText(rect, Qt.AlignCenter, symbol)
 
         # --- Highlight (Glossy effect) ---
-        if not self.is_powerup(): # Powerups already have symbol, don't clutter
+        if not self.is_powerup():
             highlight_pos = QPointF(
                 self.pos.x() - current_radius * 0.4,
                 self.pos.y() - current_radius * 0.4
@@ -210,8 +222,6 @@ class Orb:
         
     def matches(self, other):
         """Check if orbs match"""
-        # Powerups acts like wildcards or block matches?
-        # Logic: Powerups don't match normally, they trigger when destroyed
         if self.is_powerup() or other.is_powerup():
             return False
             
