@@ -133,9 +133,9 @@ class SettingsDialog(QDialog):
         display_layout.addWidget(self.fullscreen_checkbox)
         
         # Show FPS
-        self.fps_checkbox = QCheckBox("Show FPS Counter")
-        self.fps_checkbox.setStyleSheet("color: #FFA500; font-size: 14px;")
-        display_layout.addWidget(self.fps_checkbox)
+        #self.fps_checkbox = QCheckBox("Show FPS Counter")
+        #self.fps_checkbox.setStyleSheet("color: #FFA500; font-size: 14px;")
+        #display_layout.addWidget(self.fps_checkbox)
         
         display_group.setLayout(display_layout)
         main_layout.addWidget(display_group)
@@ -208,9 +208,9 @@ class SettingsDialog(QDialog):
         self.fullscreen_checkbox.setChecked(
             self.settings_manager.get('fullscreen', False)
         )
-        self.fps_checkbox.setChecked(
-            self.settings_manager.get('show_fps', False)
-        )
+        #self.fps_checkbox.setChecked(
+            #self.settings_manager.get('show_fps', False)
+        #)
         
     def update_music_volume_label(self, value):
         """Update music volume label"""
@@ -231,7 +231,7 @@ class SettingsDialog(QDialog):
         # Save display settings
         fullscreen_enabled = self.fullscreen_checkbox.isChecked()
         self.settings_manager.set('fullscreen', fullscreen_enabled)
-        self.settings_manager.set('show_fps', self.fps_checkbox.isChecked())
+        #self.settings_manager.set('show_fps', self.fps_checkbox.isChecked())
         
         print(f"SettingsDialog: Saving fullscreen={fullscreen_enabled}")
         
