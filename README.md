@@ -469,27 +469,6 @@ python -m nuitka --standalone --enable-plugin=pyside6 main.py
 
 ---
 
-## 🎯 Roadmap
-
-### Current Version (v1.0)
-- ✅ Core Zuma gameplay
-- ✅ 5 orb colors
-- ✅ Combo system
-- ✅ Level progression
-- ✅ Save/load system
-- ✅ Procedural graphics
-
-### Future Features (v2.0)
-- [ ] Power-ups (Bomb, Freeze, Fireball, Rainbow)
-- [ ] Sound effects and music
-- [ ] More level patterns
-- [ ] Leaderboard system
-- [ ] Achievement system
-- [ ] Multiple game modes
-- [ ] Particle effects enhancements
-
----
-
 ## 🤝 Contributing
 
 Contributions are welcome! Here's how you can help:
