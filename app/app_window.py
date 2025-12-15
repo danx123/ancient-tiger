@@ -1,9 +1,11 @@
 """
 Main application window managing all screens and game states
 """
-
+import os
+import sys
 from PySide6.QtWidgets import QMainWindow, QStackedWidget
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QIcon
 from app.game_manager import GameManager
 from app.state_manager import StateManager, GameState
 from ui.main_menu import MainMenu
@@ -15,6 +17,11 @@ class AppWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Ancient Tiger")
         self.setMinimumSize(1024, 768)
+        icon_path = "orb.ico"
+        if hasattr(sys, "_MEIPASS"):
+            icon_path = os.path.join(sys._MEIPASS, icon_path)
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
         
         # Initialize managers
         self.state_manager = StateManager()
