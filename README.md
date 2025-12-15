@@ -154,7 +154,10 @@ This will:
 ---
 
 ## 📸 Screenshot
-<img width="1365" height="767" alt="Screenshot 2025-12-15 092940" src="https://github.com/user-attachments/assets/789d28c7-9ebe-4923-9d3f-467bd9b3f8a6" />
+<img width="1365" height="767" alt="Screenshot 2025-12-15 225921" src="https://github.com/user-attachments/assets/7876fb55-0409-492d-9bd7-c47c3d057ff5" />
+<img width="1365" height="767" alt="Screenshot 2025-12-15 230036" src="https://github.com/user-attachments/assets/42d81c9c-539c-42fb-8517-d385ceea4273" />
+
+
 
 
 ## 🎮 How to Play
