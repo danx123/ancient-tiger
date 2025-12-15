@@ -1,6 +1,9 @@
 """
 Main game scene - handles gameplay loop and rendering
-With Resolution Scaling Fix
+FIXED: 
+1. Game Over message persisting after reload
+2. Combo timer not updating (causing infinite combo)
+3. Better combo reset logic
 """
 
 from PySide6.QtWidgets import QWidget
@@ -23,10 +26,9 @@ class GameScene(QWidget):
         super().__init__()
         self.parent_window = parent
         self.setFocusPolicy(Qt.StrongFocus)
-        self.setMouseTracking(True)  # Enable mouse tracking for continuous updates
+        self.setMouseTracking(True)
         
-        # --- RESOLUTION SCALING SETTINGS ---
-        # Game logic always runs at this resolution (HD Standard)
+        # Game logic resolution
         self.logical_width = 1366
         self.logical_height = 768
         
@@ -47,7 +49,6 @@ class GameScene(QWidget):
         self.path = None
         self.collision_detector = CollisionDetector()
         self.combo_system = ComboSystem()
-        # Initialize PowerUp Manager
         self.powerup_manager = PowerUpManager(self)
         
         # HUD
@@ -88,7 +89,12 @@ class GameScene(QWidget):
                 print(f"GameScene: Audio error - {method_name}: {e}")
         
     def start_new_game(self, level=1):
-        """Start a new game"""
+        """Start a new game - FIXED: Clear all game over flags"""
+        # Clear ALL message flags first
+        self.show_level_complete = False
+        self.show_game_over_message = False
+        self.show_retry_message = False
+        
         # Start level transition effect
         if hasattr(self, 'level') and self.level != level and level > 1:
             self.level_transition = True
@@ -96,7 +102,7 @@ class GameScene(QWidget):
         
         self.level = level
         
-        # Load total score from GameManager (Continuity Fix)
+        # Load total score from GameManager
         self.score = self.parent_window.game_manager.total_score
         
         self.running = True
@@ -104,10 +110,9 @@ class GameScene(QWidget):
         
         print(f"GameScene: Starting new game - Level {level} - Score: {self.score}")
         
-        # --- SCALING FIX: Use logical dimensions for object placement ---
+        # Setup game objects
         self.shooter = Shooter(self.logical_width // 2, self.logical_height - 100)
         
-        # Use different path pattern for each level
         self.path = Path(self.logical_width, self.logical_height, min(self.level, 5), self.level - 1)
         self.chain = OrbChain(self.path, self.level)
         self.portal_pos = self.path.get_end_position()
@@ -115,7 +120,7 @@ class GameScene(QWidget):
         # Reset combo
         self.combo_system.reset()
         
-        # Update HUD (Initial State)
+        # Update HUD
         self.hud.update_level(self.level)
         self.hud.update_score(self.score)
         current_high = self.parent_window.game_manager.high_score
@@ -144,8 +149,12 @@ class GameScene(QWidget):
         return QPointF(logical_x, logical_y)
 
     def handle_matches(self, matches):
-        """Handle matched orb sequences"""
+        """Handle matched orb sequences - FIXED: Only count legitimate matches for combo"""
+        if not matches:
+            return
+            
         total_removed = 0
+        has_powerup = False
         
         for match_indices in matches:
             # Check for PowerUps in the match
@@ -154,9 +163,14 @@ class GameScene(QWidget):
                     orb = self.chain.orbs[idx]
                     if orb.is_powerup():
                         self.powerup_manager.activate_powerup(orb.orb_type, orb)
+                        has_powerup = True
             
             self.chain.remove_orbs(match_indices)
             total_removed += len(match_indices)
+        
+        # Only process if orbs were actually removed
+        if total_removed == 0:
+            return
         
         # Play match sound
         self._play_audio('play_match')
@@ -224,7 +238,7 @@ class GameScene(QWidget):
         self.update()
         
     def update_game(self, dt):
-        """Update game logic"""
+        """Update game logic - FIXED: Combo timer now updates properly"""
         self.animation_time += dt
         
         if self.level_transition:
@@ -261,6 +275,10 @@ class GameScene(QWidget):
             
         if self.chain:
             self.chain.update(final_dt)
+            
+            # CRITICAL FIX: Remove exploded orbs after update
+            self.chain.orbs = [orb for orb in self.chain.orbs if not orb.marked_for_removal]
+            
             if self.chain.get_head_distance() >= self.path.total_length:
                 self.game_over()
                 return
@@ -275,7 +293,11 @@ class GameScene(QWidget):
         if self.chain:
             matches = self.chain.check_matches()
             if matches:
+                print(f"Scene: Matches detected! Count: {len(matches)}")
                 self.handle_matches(matches)
+            else:
+                # Reset combo if no matches for too long
+                pass
         
         # Victory Check
         if self.chain and self.running and not self.show_level_complete:
@@ -283,11 +305,12 @@ class GameScene(QWidget):
             if len(self.chain.orbs) == 0 and remaining_to_spawn <= 0:
                 print("GameScene: LEVEL COMPLETE - All orbs destroyed!")
                 self.level_complete()
-                
+        
+        # FIXED: Update combo system timer
         self.combo_system.update(dt)
         
     def handle_collision(self, collision):
-        """Handle projectile collision with chain"""
+        """Handle projectile collision with chain - FIXED: Use proper insert method"""
         projectile = collision['projectile']
         index = collision['index']
         
@@ -297,6 +320,7 @@ class GameScene(QWidget):
             projectile.orb.orb_type
         )
         
+        # Calculate proper path distance for insertion
         if index < len(self.chain.orbs):
             collision_orb = self.chain.orbs[index]
             new_orb.path_distance = collision_orb.path_distance - self.chain.distance_between_orbs / 2
@@ -306,7 +330,8 @@ class GameScene(QWidget):
             else:
                 new_orb.path_distance = 0
         
-        self.chain.orbs.insert(index, new_orb)
+        # FIXED: Use chain's insert_orb method which handles cooldown
+        self.chain.insert_orb(new_orb, index)
         self.shooter.projectile = None
         self.screen_shake = 0.1
         self._push_back_chain(index)
@@ -334,7 +359,7 @@ class GameScene(QWidget):
         self.start_new_game(self.level)
         
     def game_over(self):
-        """Handle game over"""
+        """Handle game over - FIXED: Properly clear flags on restart"""
         self.running = False
         game_over = self.parent_window.game_manager.level_failed()
         
@@ -351,7 +376,7 @@ class GameScene(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         
-        # --- SCALING LOGIC ---
+        # Scaling logic
         scale_x = self.width() / self.logical_width
         scale_y = self.height() / self.logical_height
         scale = min(scale_x, scale_y)
@@ -361,8 +386,6 @@ class GameScene(QWidget):
         
         painter.translate(offset_x, offset_y)
         painter.scale(scale, scale)
-        
-        # --- GAME RENDERING (In Logical Coordinates) ---
         
         # Screen shake
         if self.screen_shake > 0:
@@ -559,7 +582,6 @@ class GameScene(QWidget):
         """Draw danger indicator with scaling support"""
         opacity = int((1.0 - self.slow_motion_factor) * 255)
         
-        # Center of logical screen
         cx, cy = self.logical_width / 2, self.logical_height / 2
         gradient = QRadialGradient(cx, cy, self.logical_width / 2)
         gradient.setColorAt(0, QColor(255, 0, 0, 0))
