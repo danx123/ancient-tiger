@@ -6,11 +6,12 @@ FIXED:
 3. Added floating white orbs in background
 4. BLACK HOLE EFFECT: Portal rendering & Suction Particles added
 5. LAST SECOND SAVE: Added buffer zone for game over
+6. CUSTOM WALLPAPER: scene.webp support with image caching
 """
 
 from PySide6.QtWidgets import QWidget
-from PySide6.QtCore import QTimer, Qt, QRectF, QPointF
-from PySide6.QtGui import QPainter, QLinearGradient, QColor, QRadialGradient, QFont, QPen
+from PySide6.QtCore import QTimer, Qt, QRectF, QPointF, QSize
+from PySide6.QtGui import QPainter, QLinearGradient, QColor, QRadialGradient, QFont, QPen, QPixmap
 from games.shooter import Shooter
 from games.chain import OrbChain, Path
 from games.collision import CollisionDetector
@@ -19,8 +20,10 @@ from ui.hud import HUD
 from logic.combo_system import ComboSystem
 from app.state_manager import GameState
 from games.powerups import PowerUpManager
+from services.image_cache import get_image_cache
 import math
 import random
+import os
 
 class GameScene(QWidget):
     """Main gameplay scene"""
@@ -59,7 +62,7 @@ class GameScene(QWidget):
         self.timer.timeout.connect(self.game_loop)
         
         self.portal_pos = None
-        self.portal_radius = 50  # Radius visual portal diperbesar
+        self.portal_radius = 50
         
         self.slow_motion_active = False
         self.slow_motion_factor = 1.0
@@ -68,8 +71,22 @@ class GameScene(QWidget):
         self.bg_particles = []
         self._init_background_particles()
         
-        # --- NEW: Suction Particles for Black Hole Effect ---
+        # Suction Particles for Black Hole Effect
         self.suction_particles = []
+        
+        # --- CUSTOM WALLPAPER WITH CACHING ---
+        self.image_cache = get_image_cache()
+        self.scene_wallpaper = None
+        self.cached_scene_wallpaper = None
+        self.last_scene_size = None
+        self.scene_image_path = "scene.webp"
+        
+        # Load scene wallpaper if exists
+        if os.path.exists(self.scene_image_path):
+            self.scene_wallpaper = QPixmap(self.scene_image_path)
+            print(f"GameScene: Custom wallpaper loaded from {self.scene_image_path}")
+        else:
+            print(f"GameScene: Custom wallpaper not found at {self.scene_image_path}, using default gradient")
         
     def _init_background_particles(self):
         """Initialize floating white particles"""
@@ -125,7 +142,7 @@ class GameScene(QWidget):
 
         self.powerup_manager = PowerUpManager(self)
         self._init_background_particles()
-        self.suction_particles = [] # Reset suction particles
+        self.suction_particles = []
         
         self._play_audio('play_bgm')
         self.timer.start(16)
@@ -253,13 +270,12 @@ class GameScene(QWidget):
             if p['y'] < -50: p['y'] = self.logical_height + 50
             if p['y'] > self.logical_height + 50: p['y'] = -50
 
-        # --- UPDATE SUCTION PARTICLES (DRAMATIC BLACK HOLE EFFECT) ---
+        # UPDATE SUCTION PARTICLES
         if self.portal_pos:
-            # Spawn new particles randomly around the portal
             if len(self.suction_particles) < 80:
-                for _ in range(4): # Spawn quantity
+                for _ in range(4):
                     angle = random.uniform(0, 6.28)
-                    dist = random.uniform(80, 200) # Distance from center
+                    dist = random.uniform(80, 200)
                     
                     self.suction_particles.append({
                         'x': self.portal_pos.x() + math.cos(angle) * dist,
@@ -268,13 +284,12 @@ class GameScene(QWidget):
                         'size': random.uniform(2, 4),
                         'angle_offset': angle,
                         'color': random.choice([
-                            QColor(200, 100, 255), # Purple
-                            QColor(100, 200, 255), # Cyan
-                            QColor(255, 255, 255)  # White
+                            QColor(200, 100, 255),
+                            QColor(100, 200, 255),
+                            QColor(255, 255, 255)
                         ])
                     })
             
-            # Update position (Suck them in!)
             active_suction = []
             for p in self.suction_particles:
                 dx = self.portal_pos.x() - p['x']
@@ -282,24 +297,14 @@ class GameScene(QWidget):
                 dist_sq = dx*dx + dy*dy
                 dist = math.sqrt(dist_sq)
                 
-                if dist > 5: # If not yet consumed
-                    # Normalized direction to center
+                if dist > 5:
                     nx, ny = dx/dist, dy/dist
-                    
-                    # Tangential direction (Spiral effect)
                     tx, ty = -ny, nx
-                    
-                    # Calculate speed (faster as it gets closer)
                     accel = 1.0 + (200.0 / (dist + 1.0))
                     speed = p['speed'] * accel * dt
-                    
-                    # Move: Mix of direct suction (70%) and swirl (30%)
                     p['x'] += nx * speed * 0.8 + tx * speed * 0.4
                     p['y'] += ny * speed * 0.8 + ty * speed * 0.4
-                    
-                    # Shrink particle
                     p['size'] = max(0.5, p['size'] * 0.98)
-                    
                     active_suction.append(p)
             self.suction_particles = active_suction
         
@@ -309,8 +314,6 @@ class GameScene(QWidget):
         if self.chain:
             head_distance = self.chain.get_head_distance()
             total_len = self.path.total_length
-            
-            # Warning threshold (85% of path)
             danger_threshold = total_len * 0.85
             
             if head_distance >= danger_threshold:
@@ -335,17 +338,15 @@ class GameScene(QWidget):
             self.chain.update(final_dt)
             self.chain.orbs = [orb for orb in self.chain.orbs if not orb.marked_for_removal]
             
-            # --- BLACK HOLE MECHANIC (SUCK EFFECT) ---
             suck_zone_start = self.path.total_length - 40 
             
             for orb in self.chain.orbs:
                 if orb.path_distance > suck_zone_start:
                     depth = (orb.path_distance - suck_zone_start) / 60.0
-                    orb.visible_scale = max(0.0, 1.0 - depth) # Shrink visual
+                    orb.visible_scale = max(0.0, 1.0 - depth)
                 else:
                     orb.visible_scale = 1.0
 
-            # --- GAME OVER CONDITION ---
             game_over_threshold = self.path.total_length + 20
             
             if self.chain.get_head_distance() >= game_over_threshold:
@@ -449,7 +450,7 @@ class GameScene(QWidget):
         
         self._draw_background_scaled(painter, logical_rect)
         self._draw_path(painter)
-        self._draw_portal(painter) # Digambar SEBELUM orb
+        self._draw_portal(painter)
         
         if self.slow_motion_active:
             self._draw_danger_indicator_scaled(painter, logical_rect)
@@ -496,6 +497,42 @@ class GameScene(QWidget):
         painter.drawText(rect, Qt.AlignCenter, "GAME OVER")
         
     def _draw_background_scaled(self, painter, rect):
+        """Draw background with custom wallpaper or gradient"""
+        
+        # Use custom wallpaper if available
+        if self.scene_wallpaper:
+            # Get current logical size for caching
+            current_size = QSize(int(rect.width()), int(rect.height()))
+            
+            # Check if we need to update cache
+            if self.last_scene_size != current_size:
+                self.cached_scene_wallpaper = self.image_cache.get_scaled_pixmap(
+                    self.scene_image_path,
+                    current_size,
+                    keep_aspect_ratio=True
+                )
+                self.last_scene_size = current_size
+                print(f"GameScene: Updated cached wallpaper for size {current_size.width()}x{current_size.height()}")
+            
+            # Draw cached wallpaper
+            if self.cached_scene_wallpaper and not self.cached_scene_wallpaper.isNull():
+                # Center crop
+                x = (rect.width() - self.cached_scene_wallpaper.width()) / 2
+                y = (rect.height() - self.cached_scene_wallpaper.height()) / 2
+                painter.drawPixmap(int(x), int(y), self.cached_scene_wallpaper)
+                
+                # Add slight dark overlay for better visibility
+                painter.fillRect(rect, QColor(0, 0, 0, 60))
+                
+                # Draw animated particles on top
+                painter.setBrush(QColor(255, 255, 255, 35))
+                painter.setPen(Qt.NoPen)
+                for p in self.bg_particles:
+                    painter.drawEllipse(QPointF(p['x'], p['y']), p['size'], p['size'])
+                
+                return  # Skip gradient drawing
+        
+        # Default: Animated gradient background
         gradient = QLinearGradient(0, 0, 0, self.logical_height)
         level_themes = [
             {'base_hue': 220, 'accent_hue': 200, 'sat1': 60, 'sat2': 80, 'val1': 25, 'val2': 15},
@@ -538,46 +575,38 @@ class GameScene(QWidget):
         
         painter.save()
         
-        # --- DRAW SUCTION PARTICLES (Visual sedotan) ---
-        # Digambar SEBELUM core agar terlihat di belakang/disekitar lubang
+        # Draw suction particles
         painter.setPen(Qt.NoPen)
         for p in self.suction_particles:
             color = QColor(p['color'])
-            # Efek fade berdasarkan ukuran/jarak
             alpha = int(150 * (p['size'] / 4.0)) 
             color.setAlpha(min(255, max(0, alpha)))
-            
             painter.setBrush(color)
             painter.drawEllipse(QPointF(p['x'], p['y']), p['size'], p['size'])
             
         painter.translate(self.portal_pos)
         
-        # 1. Swirling Outer Nebula
+        # Swirling Outer Nebula
         for i in range(3):
             angle = (self.animation_time * (50 + i * 20)) % 360
             painter.rotate(angle)
-            
             radius = self.portal_radius * (1.2 + math.sin(self.animation_time * 2 + i) * 0.1)
-            
             gradient = QRadialGradient(0, 0, radius)
             gradient.setColorAt(0, QColor(0, 0, 0, 255))
             gradient.setColorAt(0.4, QColor(50, 0, 100, 200)) 
             gradient.setColorAt(0.8, QColor(150, 0, 255, 100))
             gradient.setColorAt(1, QColor(0, 0, 0, 0))
-            
             painter.setBrush(gradient)
             painter.setPen(Qt.NoPen)
             painter.drawEllipse(QPointF(0, 0), radius, radius)
-            
             painter.rotate(-angle)
 
-        # 2. Black Hole Core (Event Horizon)
+        # Black Hole Core
         core_radius = self.portal_radius * 0.6
         core_gradient = QRadialGradient(0, 0, core_radius)
         core_gradient.setColorAt(0, QColor(0, 0, 0)) 
         core_gradient.setColorAt(0.8, QColor(20, 0, 40)) 
         core_gradient.setColorAt(1, QColor(100, 0, 200))
-        
         painter.setBrush(core_gradient)
         painter.setPen(QPen(QColor(200, 100, 255), 2)) 
         painter.drawEllipse(QPointF(0, 0), core_radius, core_radius)
