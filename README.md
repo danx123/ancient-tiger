@@ -155,7 +155,8 @@ This will:
 
 ## 📸 Screenshot
 <img width="1365" height="767" alt="Screenshot 2025-12-15 225921" src="https://github.com/user-attachments/assets/7876fb55-0409-492d-9bd7-c47c3d057ff5" />
-<img width="1365" height="767" alt="Screenshot 2025-12-16 204204" src="https://github.com/user-attachments/assets/0b85bfdc-696d-45db-bb86-b48797b619fa" />
+<img width="1365" height="767" alt="Screenshot 2025-12-20 140833" src="https://github.com/user-attachments/assets/00974644-f06b-460e-a88a-722bf9c54164" />
+
 
 
 
