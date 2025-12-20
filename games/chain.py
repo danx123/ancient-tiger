@@ -1,8 +1,6 @@
 """
 Orb chain management and movement along path
-FIXED: 
-1. Infinite loop fixed by ignoring exploding orbs in check_matches
-2. Path class included
+UPDATED: Dynamic path generation based on level with optimized rendering
 """
 
 from PySide6.QtCore import QPointF
@@ -257,69 +255,112 @@ class OrbChain:
         for orb in self.orbs:
             orb.draw(painter)
 
-# --- INI CLASS PATH YANG SEBELUMNYA HILANG ---
+
 class Path:
-    """Curved path for orb movement"""
+    """Dynamic curved path for orb movement - Optimized with level-based patterns"""
     
-    def __init__(self, width, height, complexity=1, pattern_type=0):
+    def __init__(self, width, height, level=1):
         self.width = width
         self.height = height
+        self.level = level
         self.points = []
         self.total_length = 0
-        self.pattern_type = pattern_type
-        self._generate_path(complexity, pattern_type)
         
-    def _generate_path(self, complexity, pattern_type):
+        # Cache for quick lookups
+        self._segment_lengths = []
+        self._cumulative_lengths = []
+        
+        # Visible rendering optimization
+        self.visible_segments = []  # Only segments near orbs will be drawn
+        
+        self._generate_dynamic_path(level)
+        
+    def _generate_dynamic_path(self, level):
+        """Generate path based on level - each level has unique pattern"""
         start_x = 50
         start_y = self.height // 2
         end_x = self.width - 100
         end_y = self.height // 2
         
-        num_segments = 5 + complexity * 2
+        # More segments for higher levels (but capped for performance)
+        num_segments = min(5 + level * 2, 20)
+        
         self.points = [QPointF(start_x, start_y)]
         
-        pattern_type = pattern_type % 5
+        # Level-based path patterns
+        pattern_type = (level - 1) % 8  # Cycle through 8 patterns
         
         for i in range(1, num_segments):
             progress = i / num_segments
             x = start_x + (end_x - start_x) * progress
             
-            if pattern_type == 0:
-                wave = math.sin(progress * math.pi * 3) * (self.height * 0.3)
-                y = start_y + wave
-            elif pattern_type == 1:
-                wave = math.sin(progress * math.pi * 2) * (self.height * 0.25)
-                y = start_y + wave + (progress - 0.5) * self.height * 0.2
-            elif pattern_type == 2:
-                wave = math.sin(progress * math.pi * 4) * (self.height * 0.2 * (1 - progress))
-                y = start_y + wave
-            elif pattern_type == 3:
-                y = (start_y + self.height * 0.2) if i % 2 == 0 else (start_y - self.height * 0.2)
-                y += math.sin(progress * math.pi * 2) * 50
-            else:
-                wave1 = math.sin(progress * math.pi * 3) * (self.height * 0.2)
-                wave2 = math.sin(progress * math.pi * 5) * (self.height * 0.1)
-                y = start_y + wave1 + wave2
+            y = self._calculate_y_position(
+                start_y, progress, pattern_type, level
+            )
             
             self.points.append(QPointF(x, y))
             
         self.points.append(QPointF(end_x, end_y))
         self._calculate_length()
         
+    def _calculate_y_position(self, start_y, progress, pattern_type, level):
+        """Calculate Y position based on pattern and level difficulty"""
+        # Amplitude increases slightly with level (more challenge)
+        amplitude = self.height * (0.25 + level * 0.02)
+        amplitude = min(amplitude, self.height * 0.4)  # Cap max amplitude
+        
+        if pattern_type == 0:
+            # Classic sine wave
+            wave = math.sin(progress * math.pi * 3) * amplitude
+            return start_y + wave
+            
+        elif pattern_type == 1:
+            # Ascending wave
+            wave = math.sin(progress * math.pi * 2) * amplitude * 0.8
+            drift = (progress - 0.5) * self.height * 0.2
+            return start_y + wave + drift
+            
+        elif pattern_type == 2:
+            # Dampening wave (gets smaller towards end)
+            wave = math.sin(progress * math.pi * 4) * amplitude * (1 - progress * 0.5)
+            return start_y + wave
+            
+        elif pattern_type == 3:
+            # Zigzag with smooth transitions
+            base = start_y + math.sin(progress * math.pi * 6) * amplitude * 0.6
+            oscillation = math.sin(progress * math.pi * 2) * 50
+            return base + oscillation
+            
+        elif pattern_type == 4:
+            # Double frequency wave (complex)
+            wave1 = math.sin(progress * math.pi * 3) * amplitude * 0.7
+            wave2 = math.sin(progress * math.pi * 5) * amplitude * 0.3
+            return start_y + wave1 + wave2
+            
+        elif pattern_type == 5:
+            # S-curve with waves
+            s_curve = (progress - 0.5) * self.height * 0.3
+            wave = math.sin(progress * math.pi * 4) * amplitude * 0.5
+            return start_y + s_curve + wave
+            
+        elif pattern_type == 6:
+            # Spiral-like effect
+            wave = math.sin(progress * math.pi * 5) * amplitude * progress
+            return start_y + wave
+            
+        else:  # pattern_type == 7
+            # Random bumpy (deterministic based on progress)
+            wave = 0
+            for freq in [2, 3, 5]:
+                wave += math.sin(progress * math.pi * freq) * (amplitude / freq)
+            return start_y + wave
+            
     def _calculate_length(self):
+        """Calculate total path length and cache segment info"""
         self.total_length = 0
-        for i in range(len(self.points) - 1):
-            p1 = self.points[i]
-            p2 = self.points[i + 1]
-            dx = p2.x() - p1.x()
-            dy = p2.y() - p1.y()
-            self.total_length += math.sqrt(dx * dx + dy * dy)
-            
-    def get_position_at_distance(self, distance):
-        if distance < 0: return self.points[0]
-        if distance > self.total_length: return self.points[-1]
-            
-        current_length = 0
+        self._segment_lengths = []
+        self._cumulative_lengths = [0]
+        
         for i in range(len(self.points) - 1):
             p1 = self.points[i]
             p2 = self.points[i + 1]
@@ -327,13 +368,70 @@ class Path:
             dy = p2.y() - p1.y()
             segment_length = math.sqrt(dx * dx + dy * dy)
             
-            if current_length + segment_length >= distance:
-                t = (distance - current_length) / segment_length
-                x = p1.x() + dx * t
-                y = p1.y() + dy * t
-                return QPointF(x, y)
-            current_length += segment_length
-        return self.points[-1]
+            self._segment_lengths.append(segment_length)
+            self.total_length += segment_length
+            self._cumulative_lengths.append(self.total_length)
+            
+    def get_position_at_distance(self, distance):
+        """Fast lookup using cached cumulative lengths"""
+        if distance < 0:
+            return self.points[0]
+        if distance > self.total_length:
+            return self.points[-1]
+        
+        # Binary search for segment (optimized for large paths)
+        left, right = 0, len(self._cumulative_lengths) - 1
+        
+        while left < right - 1:
+            mid = (left + right) // 2
+            if self._cumulative_lengths[mid] <= distance:
+                left = mid
+            else:
+                right = mid
+        
+        segment_idx = left
+        
+        # Interpolate within segment
+        segment_start = self._cumulative_lengths[segment_idx]
+        segment_length = self._segment_lengths[segment_idx]
+        
+        if segment_length == 0:
+            return self.points[segment_idx]
+        
+        t = (distance - segment_start) / segment_length
+        
+        p1 = self.points[segment_idx]
+        p2 = self.points[segment_idx + 1]
+        
+        x = p1.x() + (p2.x() - p1.x()) * t
+        y = p1.y() + (p2.y() - p1.y()) * t
+        
+        return QPointF(x, y)
         
     def get_end_position(self):
         return self.points[-1]
+    
+    def update_visible_segments(self, orb_distances):
+        """
+        Update which path segments should be rendered
+        Only render segments near orbs (optimization)
+        """
+        if not orb_distances:
+            self.visible_segments = []
+            return
+        
+        # Find min and max orb distances
+        min_dist = min(orb_distances) - 100  # Buffer
+        max_dist = max(orb_distances) + 100
+        
+        # Find corresponding segment indices
+        visible_indices = set()
+        
+        for i, cumulative in enumerate(self._cumulative_lengths[:-1]):
+            segment_end = self._cumulative_lengths[i + 1]
+            
+            # Check if segment overlaps with visible range
+            if segment_end >= min_dist and cumulative <= max_dist:
+                visible_indices.add(i)
+        
+        self.visible_segments = sorted(visible_indices)
