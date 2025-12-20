@@ -5,6 +5,7 @@ Main menu interface with wallpaper support
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel
 from PySide6.QtCore import Qt, QTimer, QRectF
 from PySide6.QtGui import QPainter, QColor, QLinearGradient, QFont, QRadialGradient, QPixmap
+from PySide6.QtMultimedia import QMediaPlayer
 from app.state_manager import GameState
 import math
 import os
@@ -16,9 +17,8 @@ class MainMenu(QWidget):
         self.animation_offset = 0
         
         # Load Wallpaper Image
-        self.bg_image = None
-        # Cek lokasi file splash.webp (diasumsikan ada di root folder sejajar main.py)
-        image_path = "splash.webp" 
+        self.bg_image = None        
+        image_path = "./ancient_gfx/splash.webp" 
         
         if os.path.exists(image_path):
             self.bg_image = QPixmap(image_path)
@@ -83,6 +83,16 @@ class MainMenu(QWidget):
         self.timer = QTimer()
         self.timer.timeout.connect(self.animate)
         self.timer.start(16)  # ~60 FPS
+
+    def showEvent(self, event):
+        """Dijalankan otomatis saat menu muncul di layar"""
+        super().showEvent(event)
+        # Pastikan audio_manager tersedia
+        if hasattr(self.parent_window.game_manager, 'audio_manager'):
+            audio = self.parent_window.game_manager.audio_manager
+            # Jika BGM belum jalan, lakukan fade in
+            if audio.bgm_player.playbackState() != QMediaPlayer.PlayingState:
+                audio.fade_in_bgm(3000) # Fade in selama 3 detik biar dramatis
         
     def create_button(self, text, slot, layout, style):
         btn = QPushButton(text)
@@ -153,9 +163,9 @@ class MainMenu(QWidget):
             painter.setPen(Qt.NoPen)
             painter.drawEllipse(QRectF(x - size/2, y - size/2, size, size))
         
-    def new_game(self):
+    def new_game(self):        
         self.parent_window.game_manager.new_game()
-        self.parent_window.state_manager.change_state(GameState.PLAYING)
+        self.parent_window.state_manager.change_state(GameState.PLAYING)        
         
     def load_game(self):
         success = self.parent_window.game_manager.load_game()
