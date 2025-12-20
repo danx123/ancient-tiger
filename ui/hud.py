@@ -14,6 +14,14 @@ class HUD:
         self.high_score = 0  # Variabel baru
         self.combo = 0
         self.level = 1
+        # --- TAMBAHKAN INI ---
+        self.bonus_msg_timer = 0
+        self.bonus_msg = ""
+
+    def show_bonus_message(self, message):
+        """Memicu pesan bonus untuk muncul di layar"""
+        self.bonus_msg = message
+        self.bonus_msg_timer = 3.0  # Tampilkan selama 3 detik
         
     def update_score(self, score):
         """Update score display"""
@@ -145,6 +153,29 @@ class HUD:
             )
             
             painter.restore()
+
+        # Bonus
+        if self.bonus_msg_timer > 0:
+            # Hitung opacity berdasarkan sisa waktu (fade out)
+            opacity = min(255, int(self.bonus_msg_timer * 255))
+            
+            painter.save()
+            font = QFont("Arial", 28, QFont.Bold)
+            painter.setFont(font)
+            painter.setPen(QColor(255, 215, 0, opacity)) # Warna Emas
+            
+            # Gambar di tengah layar agak ke atas
+            text_rect = painter.fontMetrics().boundingRect(self.bonus_msg)
+            x = (self.scene.width() - text_rect.width()) // 2
+            y = self.scene.height() // 3
+            
+            painter.drawText(x, y, self.bonus_msg)
+            painter.restore()
+            
+            # Kurangi timer (dt biasanya 1/60 atau dari update scene)
+            # Karena HUD tidak punya method update mandiri yang dipanggil dt, 
+            # kita kurangi sedikit setiap frame draw
+            self.bonus_msg_timer -= 0.016
             
     def _draw_text(self, painter, text, x, y, font, color):
         """Draw text with shadow"""
