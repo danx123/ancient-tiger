@@ -49,6 +49,26 @@ class GameManager:
             self.settings_manager.set('high_score', self.high_score)
             return True
         return False
+    
+    # Reward 1 live
+    def check_life_bonus(self, old_score, new_score):
+        """Check if score crossed a 5000 point threshold"""
+        bonus_threshold = 5000
+        
+        # Hitung kelipatan lama dan baru
+        old_milestone = old_score // bonus_threshold
+        new_milestone = new_score // bonus_threshold
+        
+        # Jika kelipatan baru lebih besar, berarti baru saja lewat 5000/10000/dst
+        if new_milestone > old_milestone:
+            lives_to_add = new_milestone - old_milestone
+            self.lives += lives_to_add
+            print(f"GameManager: BONUS LIFE! Score passed {new_milestone * bonus_threshold}. Lives: {self.lives}")
+            # Simpan state agar jumlah nyawa aman jika crash/keluar
+            self.save_game() 
+            return True
+            
+        return False
         
     def load_game(self):
         """Load saved game"""
