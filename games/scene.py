@@ -1,12 +1,6 @@
 """
 Main game scene - handles gameplay loop and rendering
-FIXED: 
-1. Powerup trigger logic secure against loops
-2. Correct handling of exploding orbs
-3. Added floating white orbs in background
-4. BLACK HOLE EFFECT: Portal rendering & Suction Particles added
-5. LAST SECOND SAVE: Added buffer zone for game over
-6. CUSTOM WALLPAPER: scene.webp support with image caching
+UPDATED: Optimized path rendering with dynamic patterns
 """
 
 from PySide6.QtWidgets import QWidget
@@ -24,6 +18,7 @@ from services.image_cache import get_image_cache
 import math
 import random
 import os
+import sys
 
 class GameScene(QWidget):
     """Main gameplay scene"""
@@ -74,19 +69,89 @@ class GameScene(QWidget):
         # Suction Particles for Black Hole Effect
         self.suction_particles = []
         
-        # --- CUSTOM WALLPAPER WITH CACHING ---
+        # --- DYNAMIC WALLPAPER WITH CACHING (Level-based) ---
         self.image_cache = get_image_cache()
-        self.scene_wallpaper = None
-        self.cached_scene_wallpaper = None
-        self.last_scene_size = None
-        self.scene_image_path = "scene.webp"
+        self.current_wallpaper = None
+        self.cached_wallpaper = None
+        self.last_wallpaper_size = None
+        self.current_wallpaper_path = None
         
-        # Load scene wallpaper if exists
-        if os.path.exists(self.scene_image_path):
-            self.scene_wallpaper = QPixmap(self.scene_image_path)
-            print(f"GameScene: Custom wallpaper loaded from {self.scene_image_path}")
+        # Preload all available wallpapers
+        self.available_wallpapers = self._detect_available_wallpapers()
+        print(f"GameScene: Found {len(self.available_wallpapers)} wallpaper(s)")
+        
+    def _detect_available_wallpapers(self):
+        """Detect which level wallpapers are available (scene.webp - scene10.webp)"""
+        available = {}
+        
+        # Check for default fallback
+        if os.path.exists("./ancient_gfx/scene.webp"):
+            available['default'] = "./ancient_gfx/scene.webp"
+            print(f"GameScene: Default wallpaper found: scene.webp")
+        
+        # Check for level-specific wallpapers (scene1.webp - scene10.webp)
+        for level_num in range(1, 11):
+            wallpaper_path = f"./ancient_gfx/scene{level_num}.webp"
+            
+            # Also check PyInstaller path
+            if hasattr(sys, "_MEIPASS"):
+                frozen_path = os.path.join(sys._MEIPASS, wallpaper_path)
+                if os.path.exists(frozen_path):
+                    available[level_num] = frozen_path
+                    print(f"GameScene: Level {level_num} wallpaper found: {frozen_path}")
+                    continue
+            
+            if os.path.exists(wallpaper_path):
+                available[level_num] = wallpaper_path
+                print(f"GameScene: Level {level_num} wallpaper found: {wallpaper_path}")
+        
+        return available
+    
+    def _get_wallpaper_for_level(self, level):
+        """Get appropriate wallpaper path for current level"""
+        # Try exact level match first
+        if level in self.available_wallpapers:
+            return self.available_wallpapers[level]
+        
+        # Try cycling through available wallpapers
+        # Example: Level 11 uses scene1.webp, Level 12 uses scene2.webp, etc.
+        if len(self.available_wallpapers) > 1:  # Has wallpapers besides default
+            level_keys = [k for k in self.available_wallpapers.keys() if k != 'default']
+            if level_keys:
+                level_keys.sort()
+                cycled_level = level_keys[(level - 1) % len(level_keys)]
+                return self.available_wallpapers[cycled_level]
+        
+        # Fallback to default
+        if 'default' in self.available_wallpapers:
+            return self.available_wallpapers['default']
+        
+        # No wallpaper available
+        return None
+    
+    def _load_wallpaper_for_level(self, level):
+        """Load and cache wallpaper for specific level"""
+        wallpaper_path = self._get_wallpaper_for_level(level)
+        
+        # If wallpaper path hasn't changed, no need to reload
+        if wallpaper_path == self.current_wallpaper_path and self.current_wallpaper:
+            return
+        
+        # Load new wallpaper
+        if wallpaper_path and os.path.exists(wallpaper_path):
+            self.current_wallpaper = QPixmap(wallpaper_path)
+            self.current_wallpaper_path = wallpaper_path
+            
+            # Clear cached version to force re-scale
+            self.cached_wallpaper = None
+            self.last_wallpaper_size = None
+            
+            print(f"GameScene: Loaded wallpaper for level {level}: {wallpaper_path}")
         else:
-            print(f"GameScene: Custom wallpaper not found at {self.scene_image_path}, using default gradient")
+            self.current_wallpaper = None
+            self.current_wallpaper_path = None
+            self.cached_wallpaper = None
+            print(f"GameScene: No wallpaper for level {level}, using gradient")
         
     def _init_background_particles(self):
         """Initialize floating white particles"""
@@ -129,7 +194,10 @@ class GameScene(QWidget):
         self.paused = False
         
         self.shooter = Shooter(self.logical_width // 2, self.logical_height - 100)
-        self.path = Path(self.logical_width, self.logical_height, min(self.level, 5), self.level - 1)
+        
+        # Create dynamic path based on level
+        self.path = Path(self.logical_width, self.logical_height, self.level)
+        
         self.chain = OrbChain(self.path, self.level)
         self.portal_pos = self.path.get_end_position()
         
@@ -143,6 +211,9 @@ class GameScene(QWidget):
         self.powerup_manager = PowerUpManager(self)
         self._init_background_particles()
         self.suction_particles = []
+        
+        # Load level-specific wallpaper
+        self._load_wallpaper_for_level(self.level)
         
         self._play_audio('play_bgm')
         self.timer.start(16)
@@ -207,10 +278,19 @@ class GameScene(QWidget):
         
         base_score = total_removed * 10
         combo_multiplier = self.combo_system.add_match(total_removed)
-        self.score += int(base_score * combo_multiplier)
-        
+
+        old_score = self.score
+        points_added = int(base_score * combo_multiplier)
+        self.score += points_added        
+        self.parent_window.game_manager.total_score = self.score
         self.parent_window.game_manager.check_high_score(self.score)
-        
+
+        if self.parent_window.game_manager.check_life_bonus(old_score, self.score):
+            self._play_audio('play_power') 
+            current_lives = self.parent_window.game_manager.lives
+            self.hud.show_bonus_message(f"EXTRA LIFE! ❤️ {current_lives}")
+            print("Scene: Extra Life Granted!")      
+       
         if combo_multiplier >= 3:
             self._play_audio('play_combo')
         
@@ -338,6 +418,11 @@ class GameScene(QWidget):
             self.chain.update(final_dt)
             self.chain.orbs = [orb for orb in self.chain.orbs if not orb.marked_for_removal]
             
+            # OPTIMIZATION: Update visible path segments based on orb positions
+            if self.chain.orbs and self.path:
+                orb_distances = [orb.path_distance for orb in self.chain.orbs]
+                self.path.update_visible_segments(orb_distances)
+            
             suck_zone_start = self.path.total_length - 40 
             
             for orb in self.chain.orbs:
@@ -449,7 +534,7 @@ class GameScene(QWidget):
         logical_rect = QRectF(0, 0, self.logical_width, self.logical_height)
         
         self._draw_background_scaled(painter, logical_rect)
-        self._draw_path(painter)
+        self._draw_path_optimized(painter)  # OPTIMIZED PATH RENDERING
         self._draw_portal(painter)
         
         if self.slow_motion_active:
@@ -497,29 +582,29 @@ class GameScene(QWidget):
         painter.drawText(rect, Qt.AlignCenter, "GAME OVER")
         
     def _draw_background_scaled(self, painter, rect):
-        """Draw background with custom wallpaper or gradient"""
+        """Draw background with dynamic level-based wallpaper or gradient"""
         
-        # Use custom wallpaper if available
-        if self.scene_wallpaper:
+        # Use level-specific wallpaper if available
+        if self.current_wallpaper and not self.current_wallpaper.isNull():
             # Get current logical size for caching
             current_size = QSize(int(rect.width()), int(rect.height()))
             
             # Check if we need to update cache
-            if self.last_scene_size != current_size:
-                self.cached_scene_wallpaper = self.image_cache.get_scaled_pixmap(
-                    self.scene_image_path,
+            if self.last_wallpaper_size != current_size or not self.cached_wallpaper:
+                self.cached_wallpaper = self.image_cache.get_scaled_pixmap(
+                    self.current_wallpaper_path,
                     current_size,
                     keep_aspect_ratio=True
                 )
-                self.last_scene_size = current_size
-                print(f"GameScene: Updated cached wallpaper for size {current_size.width()}x{current_size.height()}")
+                self.last_wallpaper_size = current_size
+                print(f"GameScene: Cached wallpaper for size {current_size.width()}x{current_size.height()}")
             
             # Draw cached wallpaper
-            if self.cached_scene_wallpaper and not self.cached_scene_wallpaper.isNull():
+            if self.cached_wallpaper and not self.cached_wallpaper.isNull():
                 # Center crop
-                x = (rect.width() - self.cached_scene_wallpaper.width()) / 2
-                y = (rect.height() - self.cached_scene_wallpaper.height()) / 2
-                painter.drawPixmap(int(x), int(y), self.cached_scene_wallpaper)
+                x = (rect.width() - self.cached_wallpaper.width()) / 2
+                y = (rect.height() - self.cached_wallpaper.height()) / 2
+                painter.drawPixmap(int(x), int(y), self.cached_wallpaper)
                 
                 # Add slight dark overlay for better visibility
                 painter.fillRect(rect, QColor(0, 0, 0, 60))
@@ -532,7 +617,7 @@ class GameScene(QWidget):
                 
                 return  # Skip gradient drawing
         
-        # Default: Animated gradient background
+        # Default: Animated gradient background (fallback)
         gradient = QLinearGradient(0, 0, 0, self.logical_height)
         level_themes = [
             {'base_hue': 220, 'accent_hue': 200, 'sat1': 60, 'sat2': 80, 'val1': 25, 'val2': 15},
@@ -557,17 +642,42 @@ class GameScene(QWidget):
         for p in self.bg_particles:
             painter.drawEllipse(QPointF(p['x'], p['y']), p['size'], p['size'])
             
-    def _draw_path(self, painter):
-        if not self.path: return
+    def _draw_path_optimized(self, painter):
+        """
+        OPTIMIZED: Only draw visible segments near orbs
+        Reduces rendering overhead significantly
+        """
+        if not self.path:
+            return
+        
         painter.setPen(Qt.NoPen)
-        for i in range(len(self.path.points) - 1):
-            p1 = self.path.points[i]
-            p2 = self.path.points[i + 1]
-            gradient = QLinearGradient(p1, p2)
-            gradient.setColorAt(0, QColor(139, 69, 19, 100))
-            gradient.setColorAt(1, QColor(160, 82, 45, 100))
-            painter.setBrush(gradient)
-            painter.drawEllipse(p1, 12.5, 12.5)
+        
+        # If no visible segments computed, draw minimal path
+        if not self.path.visible_segments:
+            # Just draw start and end
+            if len(self.path.points) >= 2:
+                p1 = self.path.points[0]
+                p2 = self.path.points[-1]
+                gradient = QLinearGradient(p1, p2)
+                gradient.setColorAt(0, QColor(139, 69, 19, 80))
+                gradient.setColorAt(1, QColor(160, 82, 45, 80))
+                painter.setBrush(gradient)
+                painter.drawEllipse(p1, 10, 10)
+                painter.drawEllipse(p2, 10, 10)
+            return
+        
+        # Draw only visible segments
+        for i in self.path.visible_segments:
+            if i < len(self.path.points) - 1:
+                p1 = self.path.points[i]
+                p2 = self.path.points[i + 1]
+                
+                gradient = QLinearGradient(p1, p2)
+                gradient.setColorAt(0, QColor(139, 69, 19, 100))
+                gradient.setColorAt(1, QColor(160, 82, 45, 100))
+                
+                painter.setBrush(gradient)
+                painter.drawEllipse(p1, 12.5, 12.5)
             
     def _draw_portal(self, painter):
         """Draw Black Hole Portal with Suction Particles"""
