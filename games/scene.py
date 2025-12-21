@@ -304,11 +304,27 @@ class GameScene(QWidget):
         if hasattr(self, 'show_level_complete') and self.show_level_complete: return
 
         self.running = False
+        # Check for close call achievement
+        if self.chain and hasattr(self.parent_window.game_manager, 'achievement_tracker'):
+            orbs_remaining = len(self.chain.orbs)
+            self.parent_window.game_manager.achievement_tracker.on_level_complete_close_call(orbs_remaining)
+
         self.parent_window.game_manager.level_completed(self.score)
         self._show_level_complete_message()
         
         next_level = self.parent_window.game_manager.current_level
-        QTimer.singleShot(3000, lambda: self.start_new_game(next_level))
+        
+        # Show level complete message, then flying video, then next level
+        def show_transition_video():
+            def start_next_level():
+                print(f"GameScene: Starting level {next_level} after video")
+                self.start_new_game(next_level)
+            
+            print(f"GameScene: Showing level transition video to level {next_level}")
+            self.parent_window.show_level_transition_video(start_next_level)
+        
+        # Wait 2 seconds to show "Level Complete" message, then show video
+        QTimer.singleShot(2000, show_transition_video)
         
     def stop_game(self):
         self.running = False
