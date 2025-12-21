@@ -14,12 +14,31 @@ class OrbChain:
     def __init__(self, path, level=1):
         self.path = path
         self.orbs = []
-        self.speed = 12 + level * 2
+        
+        # Cap level at 50
+        self.level = min(level, 50)
+        
+        # Speed scaling with diminishing returns after level 30
+        if self.level <= 30:
+            self.speed = 12 + self.level * 2
+        else:
+            # Slower increase after level 30
+            self.speed = 12 + 30 * 2 + (self.level - 30) * 1
+        
+        # Spawn timer initialization
         self.spawn_timer = 0
-        self.spawn_interval = 2.5 - (level * 0.08)
-        self.spawn_interval = max(self.spawn_interval, 0.8)
+        
+        # Spawn interval with harder scaling
+        if self.level <= 20:
+            self.spawn_interval = 2.5 - (self.level * 0.08)
+        elif self.level <= 35:
+            self.spawn_interval = 0.9 - ((self.level - 20) * 0.02)
+        else:
+            # Minimum spawn interval for extreme difficulty
+            self.spawn_interval = 0.6
+        
+        self.spawn_interval = max(self.spawn_interval, 0.5)
         self.distance_between_orbs = 34
-        self.level = level
         self.frozen = False
         self.freeze_timer = 0
         
@@ -28,8 +47,8 @@ class OrbChain:
         self.orbs_since_last_powerup = 0
         self.guaranteed_powerup_after = 15
         
-        # Total orbs limit per level
-        self.max_total_orbs = self._calculate_max_orbs(level)
+        # Total orbs limit per level - scales with difficulty
+        self.max_total_orbs = self._calculate_max_orbs(self.level)
         self.orbs_spawned = 0
         
         # Spawn initial orbs
