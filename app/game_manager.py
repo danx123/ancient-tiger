@@ -6,6 +6,8 @@ from services.save_manager import SaveManager
 from services.settings_manager import SettingsManager
 from logic.score_system import ScoreSystem
 from audio.audio_manager import AudioManager
+from services.achievement_system import AchievementManager
+from services.achievement_tracker import AchievementTracker
 
 class GameManager:
     """Manages overall game state and progression"""
@@ -16,6 +18,18 @@ class GameManager:
         self.settings_manager = SettingsManager()
         self.score_system = ScoreSystem()
         
+        # --- PERBAIKAN 1: Inisialisasi Achievement System ---
+        # Tanpa ini, AchievementViewer tidak akan bisa dibuka
+        try:
+            self.achievement_manager = AchievementManager()
+            self.achievement_tracker = AchievementTracker(self.achievement_manager)
+            print("GameManager: Achievement System initialized")
+        except Exception as e:
+            print(f"GameManager: Error initializing achievements: {e}")
+            self.achievement_manager = None
+            self.achievement_tracker = None
+        # ----------------------------------------------------
+
         print("GameManager: Initializing...")
         
         # Initialize audio manager
@@ -30,7 +44,6 @@ class GameManager:
         self.total_score = 0
         self.lives = 5
         
-        # --- PERBAIKAN: Load High Score dari Settings ---
         self.high_score = self.settings_manager.get('high_score', 0)
         print(f"GameManager: High Score loaded: {self.high_score}")
         
@@ -40,6 +53,10 @@ class GameManager:
         self.total_score = 0
         self.lives = 5
         self.score_system.reset()
+        
+        # --- TAMBAHAN: Reset tracker saat game baru ---
+        if hasattr(self, 'achievement_tracker') and self.achievement_tracker:
+            self.achievement_tracker.on_game_start()
         
     def check_high_score(self, current_score):
         """Check and update high score immediately"""
@@ -93,31 +110,33 @@ class GameManager:
         
     def level_completed(self, current_total_score):
         """Handle level completion"""
-        # --- PERBAIKAN: Update total score langsung dari scene ---
         self.total_score = current_total_score
-        
-        # Cek high score lagi saat level selesai
         self.check_high_score(self.total_score)
         
         print(f"GameManager: Level {self.current_level} completed. Total Score: {self.total_score}")
         
+        # --- TAMBAHAN: Lapor ke tracker bahwa level selesai ---
+        if hasattr(self, 'achievement_tracker') and self.achievement_tracker:
+            self.achievement_tracker.on_level_complete(self.current_level)
+            
         self.current_level += 1
         print(f"GameManager: Next level: {self.current_level}")
-        
-        # Auto-save progress
         self.save_game()
         
     def level_failed(self):
         """Handle level failure"""
         print(f"GameManager: Level {self.current_level} failed")
-        
         self.lives -= 1
         print(f"GameManager: Lives remaining: {self.lives}")
         
         if self.lives <= 0:
             print("GameManager: GAME OVER - No lives remaining")
-            # Cek high score terakhir kali sebelum game over
             self.check_high_score(self.total_score)
+            
+            # --- TAMBAHAN: Lapor game over ke tracker ---
+            if hasattr(self, 'achievement_tracker') and self.achievement_tracker:
+                self.achievement_tracker.on_game_over()
+            
             self.save_game()
             return True  # Game over
         
