@@ -3,7 +3,7 @@ Audio manager for background music and sound effects
 """
 
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import QUrl, QVariantAnimation, QEasingCurve
 from pathlib import Path
 import os
 
@@ -33,7 +33,7 @@ class AudioManager:
         
         # Sound files mapping
         self.sounds = {
-            'bgm': 'ancient_bgm.mp3',
+            'bgm': 'ancient_bgm.wav',
             'combo': 'combo.wav',
             'game_over': 'game_over.wav',
             'match': 'match.wav',
@@ -214,144 +214,38 @@ class AudioManager:
         for sfx in self.sfx_players:
             sfx['player'].stop()
         print("Audio Manager: Cleanup complete")
-"""
-Audio manager for background music and sound effects
-"""
 
-from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
-from PySide6.QtCore import QUrl
-from pathlib import Path
+    def fade_in_bgm(self, duration=2000):
+        """Memutar BGM dengan efek Fade In"""
+        self.play_bgm() # Mulai putar musik
+    
+        # Animasi volume dari 0 ke volume target (misal 0.7)
+        target_volume = self.settings_manager.get('music_volume', 0.7)
+    
+        self.fade_anim = QVariantAnimation()
+        self.fade_anim.setStartValue(0.0)
+        self.fade_anim.setEndValue(target_volume)
+        self.fade_anim.setDuration(duration)
+        self.fade_anim.setEasingCurve(QEasingCurve.InOutQuad)
+    
+        # Update volume output setiap frame animasi
+        self.fade_anim.valueChanged.connect(self.bgm_output.setVolume)
+        self.fade_anim.start()
 
-class AudioManager:
-    """Manages all game audio (BGM and SFX)"""
-    
-    def __init__(self, settings_manager):
-        self.settings_manager = settings_manager
+    def fade_out_bgm(self, duration=1500, stop_after=True):
+        """Menurunkan volume BGM secara perlahan"""
+        if self.fade_anim: self.fade_anim.stop()
         
-        # Audio path
-        self.audio_path = Path("ancient_sfx")
+        current_vol = self.bgm_output.volume()
         
-        # Background Music Player
-        self.bgm_player = QMediaPlayer()
-        self.bgm_output = QAudioOutput()
-        self.bgm_player.setAudioOutput(self.bgm_output)
-        self.bgm_player.setLoops(QMediaPlayer.Loops.Infinite)  # Loop forever
+        self.fade_anim = QVariantAnimation()
+        self.fade_anim.setStartValue(current_vol)
+        self.fade_anim.setEndValue(0.0)
+        self.fade_anim.setDuration(duration)
+        self.fade_anim.setEasingCurve(QEasingCurve.InOutQuad)
+        self.fade_anim.valueChanged.connect(self.bgm_output.setVolume)
         
-        # Sound Effects Players (multiple for simultaneous sounds)
-        self.sfx_players = []
-        self.max_sfx_players = 10
-        for _ in range(self.max_sfx_players):
-            player = QMediaPlayer()
-            output = QAudioOutput()
-            player.setAudioOutput(output)
-            self.sfx_players.append({'player': player, 'output': output, 'in_use': False})
-        
-        # Sound files mapping
-        self.sounds = {
-            'bgm': 'ancient_bgm.mp3',
-            'combo': 'combo.wav',
-            'game_over': 'game_over.wav',
-            'match': 'match.wav',
-            'power': 'power.wav',
-            'shoot': 'shoot.wav'
-        }
-        
-        # Load settings
-        self.update_volumes()
-        
-        # Start BGM
-        self.play_bgm()
-    
-    def update_volumes(self):
-        """Update volume levels from settings"""
-        music_enabled = self.settings_manager.get('music_enabled', True)
-        music_volume = self.settings_manager.get('music_volume', 0.7)
-        sfx_enabled = self.settings_manager.get('sfx_enabled', True)
-        sfx_volume = self.settings_manager.get('sfx_volume', 0.8)
-        
-        # Set BGM volume
-        if music_enabled:
-            self.bgm_output.setVolume(music_volume)
-        else:
-            self.bgm_output.setVolume(0)
-        
-        # Set SFX volume
-        self.sfx_volume = sfx_volume if sfx_enabled else 0
-        for sfx in self.sfx_players:
-            sfx['output'].setVolume(self.sfx_volume)
-    
-    def play_bgm(self):
-        """Play background music"""
-        bgm_file = self.audio_path / self.sounds['bgm']
-        if bgm_file.exists():
-            url = QUrl.fromLocalFile(str(bgm_file.absolute()))
-            self.bgm_player.setSource(url)
-            self.bgm_player.play()
-        else:
-            print(f"Warning: BGM file not found: {bgm_file}")
-    
-    def stop_bgm(self):
-        """Stop background music"""
-        self.bgm_player.stop()
-    
-    def pause_bgm(self):
-        """Pause background music"""
-        self.bgm_player.pause()
-    
-    def resume_bgm(self):
-        """Resume background music"""
-        self.bgm_player.play()
-    
-    def play_sfx(self, sound_name):
-        """Play sound effect"""
-        if sound_name not in self.sounds:
-            print(f"Warning: Sound '{sound_name}' not found")
-            return
-        
-        # Find available player
-        sfx_player = None
-        for sfx in self.sfx_players:
-            if not sfx['in_use'] or sfx['player'].playbackState() == QMediaPlayer.PlaybackState.StoppedState:
-                sfx_player = sfx
-                break
-        
-        if not sfx_player:
-            # All players busy, use first one
-            sfx_player = self.sfx_players[0]
-        
-        # Load and play sound
-        sound_file = self.audio_path / self.sounds[sound_name]
-        if sound_file.exists():
-            url = QUrl.fromLocalFile(str(sound_file.absolute()))
-            sfx_player['player'].setSource(url)
-            sfx_player['output'].setVolume(self.sfx_volume)
-            sfx_player['player'].play()
-            sfx_player['in_use'] = True
-        else:
-            print(f"Warning: SFX file not found: {sound_file}")
-    
-    def play_shoot(self):
-        """Play shoot sound"""
-        self.play_sfx('shoot')
-    
-    def play_match(self):
-        """Play match sound"""
-        self.play_sfx('match')
-    
-    def play_combo(self):
-        """Play combo sound"""
-        self.play_sfx('combo')
-    
-    def play_power(self):
-        """Play power-up sound"""
-        self.play_sfx('power')
-    
-    def play_game_over(self):
-        """Play game over sound"""
-        self.play_sfx('game_over')
-    
-    def cleanup(self):
-        """Clean up audio resources"""
-        self.stop_bgm()
-        for sfx in self.sfx_players:
-            sfx['player'].stop()
+        if stop_after:
+            self.fade_anim.finished.connect(self.bgm_player.stop)
+            
+        self.fade_anim.start()
