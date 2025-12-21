@@ -1,6 +1,7 @@
 """
 Main application window managing all screens and game states
 FIXED: Proper pause/resume handling
+UPDATED: First run trailer and level transition videos
 """
 import os
 import sys
@@ -12,6 +13,9 @@ from app.state_manager import StateManager, GameState
 from ui.main_menu import MainMenu
 from games.scene import GameScene
 from ui.pause_menu import PauseMenu
+from ui.video_player import VideoPlayer
+from services.first_run_manager import FirstRunManager
+from ui.achievement_popup import AchievementPopup
 
 class AppWindow(QMainWindow):
     def __init__(self):
@@ -27,6 +31,7 @@ class AppWindow(QMainWindow):
         # Initialize managers
         self.state_manager = StateManager()
         self.game_manager = GameManager(self)
+        self.first_run_manager = FirstRunManager()
         
         print("AppWindow: Game Manager initialized")
         print(f"AppWindow: Audio Manager available: {hasattr(self.game_manager, 'audio_manager')}")
@@ -51,8 +56,19 @@ class AppWindow(QMainWindow):
         # Connect state changes
         self.state_manager.state_changed.connect(self.on_state_changed)
         
+        # Connect achievement notifications
+        if hasattr(self.game_manager, 'achievement_manager'):
+            self.game_manager.achievement_manager.achievement_unlocked.connect(
+                self.show_achievement_notification
+            )
+        
         # Set initial state
         self.state_manager.change_state(GameState.MAIN_MENU)
+        
+        # Check first run and show trailer
+        if self.first_run_manager.is_first_run():
+            print("AppWindow: First run detected, showing trailer")
+            QTimer.singleShot(500, self.show_first_run_trailer)
         
     def on_state_changed(self, state):
         """Handle state transitions"""
@@ -140,3 +156,58 @@ class AppWindow(QMainWindow):
         print("AppWindow: Closing, saving settings...")
         self.game_manager.settings_manager.save_settings()
         event.accept()
+    
+    def show_first_run_trailer(self):
+        """Show trailer on first run"""
+        trailer_path = "./ancient_gfx/trailer.mp4"
+        
+        video_player = VideoPlayer(self)
+        
+        def on_trailer_finish():
+            print("AppWindow: First run trailer finished")
+            self.first_run_manager.mark_not_first_run()
+            video_player.deleteLater()
+        
+        def on_trailer_skip():
+            print("AppWindow: First run trailer skipped")
+            self.first_run_manager.mark_not_first_run()
+            video_player.deleteLater()
+        
+        video_player.video_finished.connect(on_trailer_finish)
+        video_player.video_skipped.connect(on_trailer_skip)
+        video_player.play_video(trailer_path)
+    
+    def show_level_transition_video(self, callback=None):
+        """Show flying video on level transition"""
+        flying_path = "./ancient_gfx/flying.mp4"
+        
+        print(f"AppWindow: Attempting to play flying video from {flying_path}")
+        
+        video_player = VideoPlayer(self)
+        
+        def on_video_finish():
+            print("AppWindow: Level transition video finished")
+            video_player.close()
+            video_player.deleteLater()
+            if callback:
+                QTimer.singleShot(100, callback)
+        
+        def on_video_skip():
+            print("AppWindow: Level transition video skipped")
+            video_player.close()
+            video_player.deleteLater()
+            if callback:
+                QTimer.singleShot(100, callback)
+        
+        video_player.video_finished.connect(on_video_finish)
+        video_player.video_skipped.connect(on_video_skip)
+        video_player.play_video(flying_path)
+    
+    def show_achievement_notification(self, achievement_id, name, description):
+        """Show achievement unlock notification"""
+        if hasattr(self.game_manager, 'achievement_manager'):
+            ach_data = self.game_manager.achievement_manager.ACHIEVEMENTS.get(achievement_id)
+            if ach_data:
+                icon = ach_data.get('icon', '🏆')
+                popup = AchievementPopup(achievement_id, name, description, icon, self)
+                popup.show_notification(self)
