@@ -1,0 +1,111 @@
+ANCIENT TIGER: THE BLACK HOLE ESCAPE
+Version 5.0.0
+
+ABOUT THE GAME
+Ancient Tiger: The Black Hole Escape is a mystical puzzle game
+
+that combines ancient legends with cosmic phenomena.
+
+Match colorful orbs before they reach the portal,
+
+and prevent the ancient seal from breaking.
+
+GAME FEATURES
+🎮 Dynamic Gameplay
+
+50 challenging levels with unique paths
+Progressive difficulty system
+Smooth 60 FPS gameplay
+💥 Power-Ups
+
+Bomb: Destroys nearby orbs
+Slow: Freezes the chain
+Reverse: Pushes orbs backward
+Accuracy: Shows aim trajectory
+🏆 Achievement System
+
+36 achievements to unlock
+Secret hidden achievements
+Track your progress
+🎨 Visual Experience
+
+Beautiful particle effects
+Dynamic black hole portal
+Level-specific backgrounds
+Smooth animations
+🎵 Audio
+
+Atmospheric background music
+Satisfying sound effects
+Adjustable audio settings
+CONTROLS
+🖱️ Mouse
+
+Move: Aim shooter
+Left Click: Fire orb
+Right Click: Swap orbs
+⌨️ Keyboard
+
+ESC: Pause/Resume game
+F11: Toggle fullscreen
+TIPS & TRICKS
+💡 Create combos for massive score multipliers
+
+💡 Every 5000 points grants an extra life
+
+💡 Use power-ups strategically in tough situations
+
+💡 Watch for the danger warning - slow motion activates!
+
+💡 Rainbow orbs match with any color
+
+CREDITS
+🎮 Game Design & Development
+
+Macan Games Studio
+🎨 Art & Visual Design
+
+Ancient Tiger Art Team
+🎵 Audio & Music
+
+Cosmic Sound Studios
+📖 Story & Narrative
+
+The Lore Keepers
+SPECIAL THANKS
+To all beta testers and players
+
+who helped make this game better.
+
+Your feedback shaped this experience.
+
+DEVELOPER NOTES
+This game was crafted with passion
+
+to bring you a unique puzzle experience.
+
+We hope you enjoy your journey
+
+through the mystical dimensions.
+
+Stay tuned for future updates!
+
+CONTACT
+🌐 Website: https://github.com/danx123
+
+📧 Email: danxdigitalsolution@gmail.com
+
+
+COPYRIGHT
+© 2025 Macan Angkasa
+
+All Rights Reserved
+
+Ancient Tiger™ is a trademark of Macan Games Suite
+
+Thank you for playing!
+
+May the Ancient Tiger guide your path.
+
+🐯
+
