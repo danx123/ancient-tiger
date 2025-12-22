@@ -1,6 +1,6 @@
 """
 Main game scene - handles gameplay loop and rendering
-UPDATED: Optimized path rendering with dynamic patterns
+UPDATED: Added Cheat Support for Visuals and Logic
 """
 
 from PySide6.QtWidgets import QWidget
@@ -81,80 +81,50 @@ class GameScene(QWidget):
         print(f"GameScene: Found {len(self.available_wallpapers)} wallpaper(s)")
         
     def _detect_available_wallpapers(self):
-        """Detect which level wallpapers are available (scene.webp - scene10.webp)"""
+        """Detect which level wallpapers are available"""
         available = {}
-        
-        # Check for default fallback
         if os.path.exists("./ancient_gfx/scene.webp"):
             available['default'] = "./ancient_gfx/scene.webp"
-            print(f"GameScene: Default wallpaper found: scene.webp")
         
-        # Check for level-specific wallpapers (scene1.webp - scene10.webp)
         for level_num in range(1, 11):
             wallpaper_path = f"./ancient_gfx/scene{level_num}.webp"
-            
-            # Also check PyInstaller path
             if hasattr(sys, "_MEIPASS"):
                 frozen_path = os.path.join(sys._MEIPASS, wallpaper_path)
                 if os.path.exists(frozen_path):
                     available[level_num] = frozen_path
-                    print(f"GameScene: Level {level_num} wallpaper found: {frozen_path}")
                     continue
             
             if os.path.exists(wallpaper_path):
                 available[level_num] = wallpaper_path
-                print(f"GameScene: Level {level_num} wallpaper found: {wallpaper_path}")
-        
         return available
     
     def _get_wallpaper_for_level(self, level):
-        """Get appropriate wallpaper path for current level"""
-        # Try exact level match first
         if level in self.available_wallpapers:
             return self.available_wallpapers[level]
-        
-        # Try cycling through available wallpapers
-        # Example: Level 11 uses scene1.webp, Level 12 uses scene2.webp, etc.
-        if len(self.available_wallpapers) > 1:  # Has wallpapers besides default
+        if len(self.available_wallpapers) > 1:
             level_keys = [k for k in self.available_wallpapers.keys() if k != 'default']
             if level_keys:
                 level_keys.sort()
                 cycled_level = level_keys[(level - 1) % len(level_keys)]
                 return self.available_wallpapers[cycled_level]
-        
-        # Fallback to default
-        if 'default' in self.available_wallpapers:
-            return self.available_wallpapers['default']
-        
-        # No wallpaper available
-        return None
+        return self.available_wallpapers.get('default')
     
     def _load_wallpaper_for_level(self, level):
-        """Load and cache wallpaper for specific level"""
         wallpaper_path = self._get_wallpaper_for_level(level)
-        
-        # If wallpaper path hasn't changed, no need to reload
         if wallpaper_path == self.current_wallpaper_path and self.current_wallpaper:
             return
         
-        # Load new wallpaper
         if wallpaper_path and os.path.exists(wallpaper_path):
             self.current_wallpaper = QPixmap(wallpaper_path)
             self.current_wallpaper_path = wallpaper_path
-            
-            # Clear cached version to force re-scale
             self.cached_wallpaper = None
             self.last_wallpaper_size = None
-            
-            print(f"GameScene: Loaded wallpaper for level {level}: {wallpaper_path}")
         else:
             self.current_wallpaper = None
             self.current_wallpaper_path = None
             self.cached_wallpaper = None
-            print(f"GameScene: No wallpaper for level {level}, using gradient")
         
     def _init_background_particles(self):
-        """Initialize floating white particles"""
         self.bg_particles = []
         for _ in range(30):
             self.bg_particles.append({
@@ -194,10 +164,7 @@ class GameScene(QWidget):
         self.paused = False
         
         self.shooter = Shooter(self.logical_width // 2, self.logical_height - 100)
-        
-        # Create dynamic path based on level
         self.path = Path(self.logical_width, self.logical_height, self.level)
-        
         self.chain = OrbChain(self.path, self.level)
         self.portal_pos = self.path.get_end_position()
         
@@ -212,7 +179,6 @@ class GameScene(QWidget):
         self._init_background_particles()
         self.suction_particles = []
         
-        # Load level-specific wallpaper
         self._load_wallpaper_for_level(self.level)
         
         self._play_audio('play_bgm')
@@ -222,17 +188,14 @@ class GameScene(QWidget):
         scale_x = self.width() / self.logical_width
         scale_y = self.height() / self.logical_height
         scale = min(scale_x, scale_y)
-        
         offset_x = (self.width() - (self.logical_width * scale)) / 2
         offset_y = (self.height() - (self.logical_height * scale)) / 2
-        
         logical_x = (physical_pos.x() - offset_x) / scale
         logical_y = (physical_pos.y() - offset_y) / scale
         return QPointF(logical_x, logical_y)
 
     def handle_matches(self, matches):
         if not matches: return
-            
         powerup_orbs_to_trigger = []
         all_indices_to_remove = set()
         
@@ -289,7 +252,6 @@ class GameScene(QWidget):
             self._play_audio('play_power') 
             current_lives = self.parent_window.game_manager.lives
             self.hud.show_bonus_message(f"EXTRA LIFE! ❤️ {current_lives}")
-            print("Scene: Extra Life Granted!")      
        
         if combo_multiplier >= 3:
             self._play_audio('play_combo')
@@ -297,33 +259,25 @@ class GameScene(QWidget):
         self.hud.update_score(self.score)
         self.hud.update_combo(self.combo_system.current_combo)
         self.hud.update_high_score(self.parent_window.game_manager.high_score)
-        
         self.screen_shake = 0.2
 
     def level_complete(self):
         if hasattr(self, 'show_level_complete') and self.show_level_complete: return
 
         self.running = False
-        # Check for close call achievement
         if self.chain and hasattr(self.parent_window.game_manager, 'achievement_tracker'):
             orbs_remaining = len(self.chain.orbs)
             self.parent_window.game_manager.achievement_tracker.on_level_complete_close_call(orbs_remaining)
 
         self.parent_window.game_manager.level_completed(self.score)
         self._show_level_complete_message()
-        
         next_level = self.parent_window.game_manager.current_level
         
-        # Show level complete message, then flying video, then next level
         def show_transition_video():
             def start_next_level():
-                print(f"GameScene: Starting level {next_level} after video")
                 self.start_new_game(next_level)
-            
-            print(f"GameScene: Showing level transition video to level {next_level}")
             self.parent_window.show_level_transition_video(start_next_level)
         
-        # Wait 2 seconds to show "Level Complete" message, then show video
         QTimer.singleShot(2000, show_transition_video)
         
     def stop_game(self):
@@ -350,40 +304,60 @@ class GameScene(QWidget):
     def update_game(self, dt):
         self.animation_time += dt
         
+        # --- CHEAT SYSTEM INTEGRATION ---
+        cheat_sys = None
+        if hasattr(self.parent_window, 'game_manager') and hasattr(self.parent_window.game_manager, 'cheat_system'):
+            cheat_sys = self.parent_window.game_manager.cheat_system
+
+        # CHEAT: Speed Multiplier
+        speed_factor = 1.0
+        if cheat_sys:
+            speed_factor = cheat_sys.speed_multiplier
+            
+        final_dt_base = dt * speed_factor
+
         if self.level_transition:
-            self.level_transition_progress += dt * 2
+            self.level_transition_progress += final_dt_base * 2
             if self.level_transition_progress >= 1.0:
                 self.level_transition = False
                 self.level_transition_progress = 0
             return
 
-        # Update Background Particles
+        # Update Particles
         for p in self.bg_particles:
-            p['x'] += p['speed_x'] * dt
-            p['y'] += p['speed_y'] * dt
+            p['x'] += p['speed_x'] * final_dt_base
+            p['y'] += p['speed_y'] * final_dt_base
             if p['x'] < -50: p['x'] = self.logical_width + 50
             if p['x'] > self.logical_width + 50: p['x'] = -50
             if p['y'] < -50: p['y'] = self.logical_height + 50
             if p['y'] > self.logical_height + 50: p['y'] = -50
+            
+        # CHEAT: Party Mode Logic
+        if cheat_sys and cheat_sys.party_mode:
+            if random.random() < 0.2:
+                self.bg_particles.append({
+                    'x': random.uniform(0, self.logical_width),
+                    'y': random.uniform(0, self.logical_height),
+                    'speed_x': random.uniform(-100, 100),
+                    'speed_y': random.uniform(-100, 100),
+                    'size': random.uniform(5, 25)
+                })
+                if len(self.bg_particles) > 200:
+                    self.bg_particles.pop(0)
 
-        # UPDATE SUCTION PARTICLES
+        # Update Suction Particles
         if self.portal_pos:
             if len(self.suction_particles) < 80:
                 for _ in range(4):
                     angle = random.uniform(0, 6.28)
                     dist = random.uniform(80, 200)
-                    
                     self.suction_particles.append({
                         'x': self.portal_pos.x() + math.cos(angle) * dist,
                         'y': self.portal_pos.y() + math.sin(angle) * dist,
                         'speed': random.uniform(150, 300),
                         'size': random.uniform(2, 4),
                         'angle_offset': angle,
-                        'color': random.choice([
-                            QColor(200, 100, 255),
-                            QColor(100, 200, 255),
-                            QColor(255, 255, 255)
-                        ])
+                        'color': random.choice([QColor(200, 100, 255), QColor(100, 200, 255), QColor(255, 255, 255)])
                     })
             
             active_suction = []
@@ -397,22 +371,27 @@ class GameScene(QWidget):
                     nx, ny = dx/dist, dy/dist
                     tx, ty = -ny, nx
                     accel = 1.0 + (200.0 / (dist + 1.0))
-                    speed = p['speed'] * accel * dt
+                    speed = p['speed'] * accel * final_dt_base
                     p['x'] += nx * speed * 0.8 + tx * speed * 0.4
                     p['y'] += ny * speed * 0.8 + ty * speed * 0.4
                     p['size'] = max(0.5, p['size'] * 0.98)
                     active_suction.append(p)
             self.suction_particles = active_suction
         
-        self.powerup_manager.update(dt)
-        speed_mult = self.powerup_manager.get_speed_multiplier()
+        self.powerup_manager.update(final_dt_base)
+        powerup_speed_mult = self.powerup_manager.get_speed_multiplier()
 
         if self.chain:
             head_distance = self.chain.get_head_distance()
             total_len = self.path.total_length
-            danger_threshold = total_len * 0.85
             
-            if head_distance >= danger_threshold:
+            # CHEAT: No Clip
+            no_clip = False
+            if cheat_sys and cheat_sys.no_clip:
+                no_clip = True
+                
+            danger_threshold = total_len * 0.85
+            if head_distance >= danger_threshold and not no_clip:
                 self.slow_motion_active = True
                 danger_level = (head_distance - danger_threshold) / (total_len - danger_threshold)
                 self.slow_motion_factor = 1.0 - (danger_level * 0.4)
@@ -420,27 +399,27 @@ class GameScene(QWidget):
                 self.slow_motion_active = False
                 self.slow_motion_factor = 1.0
             
-            final_dt = dt * self.slow_motion_factor * speed_mult
-        else:
-            final_dt = dt
-        
-        if self.screen_shake > 0:
-            self.screen_shake = max(0, self.screen_shake - dt * 5)
-        
-        if self.shooter:
-            self.shooter.update(dt)
+            chain_dt = final_dt_base * self.slow_motion_factor * powerup_speed_mult
             
-        if self.chain:
-            self.chain.update(final_dt)
+            if cheat_sys and cheat_sys.no_spawn:
+                 self.chain.spawn_timer = 0
+            
+            self.chain.update(chain_dt)
             self.chain.orbs = [orb for orb in self.chain.orbs if not orb.marked_for_removal]
             
-            # OPTIMIZATION: Update visible path segments based on orb positions
+            # CHEAT: Size Multiplier
+            if cheat_sys:
+                size_mult = cheat_sys.orb_size_multiplier
+                if size_mult != 1.0:
+                    for orb in self.chain.orbs:
+                        orb.visible_scale *= size_mult
+
+            # Logic: Update visible segments
             if self.chain.orbs and self.path:
                 orb_distances = [orb.path_distance for orb in self.chain.orbs]
                 self.path.update_visible_segments(orb_distances)
             
             suck_zone_start = self.path.total_length - 40 
-            
             for orb in self.chain.orbs:
                 if orb.path_distance > suck_zone_start:
                     depth = (orb.path_distance - suck_zone_start) / 60.0
@@ -449,10 +428,19 @@ class GameScene(QWidget):
                     orb.visible_scale = 1.0
 
             game_over_threshold = self.path.total_length + 20
-            
             if self.chain.get_head_distance() >= game_over_threshold:
-                self.game_over()
-                return
+                if not no_clip:
+                    self.game_over()
+                    return
+                else:
+                     for orb in self.chain.orbs:
+                         orb.path_distance -= 500
+            
+        if self.screen_shake > 0:
+            self.screen_shake = max(0, self.screen_shake - final_dt_base * 5)
+        
+        if self.shooter:
+            self.shooter.update(final_dt_base)
             
         if self.shooter and self.shooter.projectile and self.chain:
             collision = self.collision_detector.check_collision(
@@ -471,17 +459,12 @@ class GameScene(QWidget):
             if len(self.chain.orbs) == 0 and remaining_to_spawn <= 0:
                 self.level_complete()
         
-        self.combo_system.update(dt)
+        self.combo_system.update(final_dt_base)
         
     def handle_collision(self, collision):
         projectile = collision['projectile']
         index = collision['index']
-        
-        new_orb = Orb(
-            projectile.orb.pos.x(),
-            projectile.orb.pos.y(),
-            projectile.orb.orb_type
-        )
+        new_orb = Orb(projectile.orb.pos.x(), projectile.orb.pos.y(), projectile.orb.orb_type)
         
         if index < len(self.chain.orbs):
             collision_orb = self.chain.orbs[index]
@@ -535,7 +518,6 @@ class GameScene(QWidget):
         scale_x = self.width() / self.logical_width
         scale_y = self.height() / self.logical_height
         scale = min(scale_x, scale_y)
-        
         offset_x = (self.width() - (self.logical_width * scale)) / 2
         offset_y = (self.height() - (self.logical_height * scale)) / 2
         
@@ -549,8 +531,30 @@ class GameScene(QWidget):
         
         logical_rect = QRectF(0, 0, self.logical_width, self.logical_height)
         
-        self._draw_background_scaled(painter, logical_rect)
-        self._draw_path_optimized(painter)  # OPTIMIZED PATH RENDERING
+        # CHEAT: Party Mode Background
+        cheat_sys = None
+        if hasattr(self.parent_window, 'game_manager'):
+             cheat_sys = self.parent_window.game_manager.cheat_system
+
+        if cheat_sys and cheat_sys.party_mode:
+             hue = (self.animation_time * 100) % 360
+             painter.fillRect(logical_rect, QColor.fromHsv(int(hue), 150, 50))
+        else:
+            self._draw_background_scaled(painter, logical_rect)
+        
+        self._draw_path_optimized(painter)
+        
+        # CHEAT: Show Full Path
+        if cheat_sys and cheat_sys.show_full_path and self.path:
+            painter.save()
+            pen = QPen(QColor(0, 255, 0, 100), 2, Qt.DashLine)
+            painter.setPen(pen)
+            painter.setBrush(Qt.NoBrush)
+            points = self.path.points
+            for i in range(len(points) - 1):
+                painter.drawLine(points[i], points[i+1])
+            painter.restore()
+
         self._draw_portal(painter)
         
         if self.slow_motion_active:
@@ -561,6 +565,17 @@ class GameScene(QWidget):
         if self.shooter:
             self.shooter.draw(painter)
         self.hud.draw(painter)
+        
+        # CHEAT: Show FPS
+        if cheat_sys and cheat_sys.show_fps:
+             painter.save()
+             painter.setPen(QColor(0, 255, 0))
+             painter.setFont(QFont("Consolas", 16, QFont.Bold))
+             fps = 60 
+             if self.timer.interval() > 0:
+                 fps = int(1000 / self.timer.interval())
+             painter.drawText(self.logical_width - 120, 40, f"FPS: {fps}")
+             painter.restore()
         
         if hasattr(self, 'show_level_complete') and self.show_level_complete:
             self._draw_level_complete(painter, logical_rect)
@@ -598,42 +613,25 @@ class GameScene(QWidget):
         painter.drawText(rect, Qt.AlignCenter, "GAME OVER")
         
     def _draw_background_scaled(self, painter, rect):
-        """Draw background with dynamic level-based wallpaper or gradient"""
-        
-        # Use level-specific wallpaper if available
         if self.current_wallpaper and not self.current_wallpaper.isNull():
-            # Get current logical size for caching
             current_size = QSize(int(rect.width()), int(rect.height()))
-            
-            # Check if we need to update cache
             if self.last_wallpaper_size != current_size or not self.cached_wallpaper:
                 self.cached_wallpaper = self.image_cache.get_scaled_pixmap(
-                    self.current_wallpaper_path,
-                    current_size,
-                    keep_aspect_ratio=True
+                    self.current_wallpaper_path, current_size, keep_aspect_ratio=True
                 )
                 self.last_wallpaper_size = current_size
-                print(f"GameScene: Cached wallpaper for size {current_size.width()}x{current_size.height()}")
             
-            # Draw cached wallpaper
             if self.cached_wallpaper and not self.cached_wallpaper.isNull():
-                # Center crop
                 x = (rect.width() - self.cached_wallpaper.width()) / 2
                 y = (rect.height() - self.cached_wallpaper.height()) / 2
                 painter.drawPixmap(int(x), int(y), self.cached_wallpaper)
-                
-                # Add slight dark overlay for better visibility
                 painter.fillRect(rect, QColor(0, 0, 0, 60))
-                
-                # Draw animated particles on top
                 painter.setBrush(QColor(255, 255, 255, 35))
                 painter.setPen(Qt.NoPen)
                 for p in self.bg_particles:
                     painter.drawEllipse(QPointF(p['x'], p['y']), p['size'], p['size'])
-                
-                return  # Skip gradient drawing
+                return
         
-        # Default: Animated gradient background (fallback)
         gradient = QLinearGradient(0, 0, 0, self.logical_height)
         level_themes = [
             {'base_hue': 220, 'accent_hue': 200, 'sat1': 60, 'sat2': 80, 'val1': 25, 'val2': 15},
@@ -659,18 +657,9 @@ class GameScene(QWidget):
             painter.drawEllipse(QPointF(p['x'], p['y']), p['size'], p['size'])
             
     def _draw_path_optimized(self, painter):
-        """
-        OPTIMIZED: Only draw visible segments near orbs
-        Reduces rendering overhead significantly
-        """
-        if not self.path:
-            return
-        
+        if not self.path: return
         painter.setPen(Qt.NoPen)
-        
-        # If no visible segments computed, draw minimal path
         if not self.path.visible_segments:
-            # Just draw start and end
             if len(self.path.points) >= 2:
                 p1 = self.path.points[0]
                 p2 = self.path.points[-1]
@@ -682,26 +671,19 @@ class GameScene(QWidget):
                 painter.drawEllipse(p2, 10, 10)
             return
         
-        # Draw only visible segments
         for i in self.path.visible_segments:
             if i < len(self.path.points) - 1:
                 p1 = self.path.points[i]
                 p2 = self.path.points[i + 1]
-                
                 gradient = QLinearGradient(p1, p2)
                 gradient.setColorAt(0, QColor(139, 69, 19, 100))
                 gradient.setColorAt(1, QColor(160, 82, 45, 100))
-                
                 painter.setBrush(gradient)
                 painter.drawEllipse(p1, 12.5, 12.5)
             
     def _draw_portal(self, painter):
-        """Draw Black Hole Portal with Suction Particles"""
         if not self.portal_pos: return
-        
         painter.save()
-        
-        # Draw suction particles
         painter.setPen(Qt.NoPen)
         for p in self.suction_particles:
             color = QColor(p['color'])
@@ -709,10 +691,7 @@ class GameScene(QWidget):
             color.setAlpha(min(255, max(0, alpha)))
             painter.setBrush(color)
             painter.drawEllipse(QPointF(p['x'], p['y']), p['size'], p['size'])
-            
         painter.translate(self.portal_pos)
-        
-        # Swirling Outer Nebula
         for i in range(3):
             angle = (self.animation_time * (50 + i * 20)) % 360
             painter.rotate(angle)
@@ -726,8 +705,6 @@ class GameScene(QWidget):
             painter.setPen(Qt.NoPen)
             painter.drawEllipse(QPointF(0, 0), radius, radius)
             painter.rotate(-angle)
-
-        # Black Hole Core
         core_radius = self.portal_radius * 0.6
         core_gradient = QRadialGradient(0, 0, core_radius)
         core_gradient.setColorAt(0, QColor(0, 0, 0)) 
@@ -736,7 +713,6 @@ class GameScene(QWidget):
         painter.setBrush(core_gradient)
         painter.setPen(QPen(QColor(200, 100, 255), 2)) 
         painter.drawEllipse(QPointF(0, 0), core_radius, core_radius)
-        
         painter.restore()
     
     def _draw_danger_indicator_scaled(self, painter, rect):

@@ -8,6 +8,7 @@ from logic.score_system import ScoreSystem
 from audio.audio_manager import AudioManager
 from services.achievement_system import AchievementManager
 from services.achievement_tracker import AchievementTracker
+from services.cheat_system import CheatSystem 
 
 class GameManager:
     """Manages overall game state and progression"""
@@ -18,8 +19,16 @@ class GameManager:
         self.settings_manager = SettingsManager()
         self.score_system = ScoreSystem()
         
-        # --- PERBAIKAN 1: Inisialisasi Achievement System ---
-        # Tanpa ini, AchievementViewer tidak akan bisa dibuka
+       
+        try:
+            self.cheat_system = CheatSystem(self)
+            print("GameManager: Cheat System initialized")
+        except Exception as e:
+            print(f"GameManager: Error initializing cheat system: {e}")
+            self.cheat_system = None
+        # --------------------------------------------
+        
+        # --- Inisialisasi Achievement System ---
         try:
             self.achievement_manager = AchievementManager()
             self.achievement_tracker = AchievementTracker(self.achievement_manager)
@@ -28,8 +37,7 @@ class GameManager:
             print(f"GameManager: Error initializing achievements: {e}")
             self.achievement_manager = None
             self.achievement_tracker = None
-        # ----------------------------------------------------
-
+        
         print("GameManager: Initializing...")
         
         # Initialize audio manager
@@ -54,53 +62,42 @@ class GameManager:
         self.lives = 5
         self.score_system.reset()
         
-        # --- TAMBAHAN: Reset tracker saat game baru ---
+        # Reset tracker saat game baru
         if hasattr(self, 'achievement_tracker') and self.achievement_tracker:
             self.achievement_tracker.on_game_start()
-        
+            
+    
     def check_high_score(self, current_score):
-        """Check and update high score immediately"""
         if current_score > self.high_score:
             self.high_score = current_score
-            # Simpan otomatis ke settings agar tidak hilang
             self.settings_manager.set('high_score', self.high_score)
             return True
         return False
     
-    # Reward 1 live
     def check_life_bonus(self, old_score, new_score):
-        """Check if score crossed a 5000 point threshold"""
         bonus_threshold = 5000
-        
-        # Hitung kelipatan lama dan baru
         old_milestone = old_score // bonus_threshold
         new_milestone = new_score // bonus_threshold
         
-        # Jika kelipatan baru lebih besar, berarti baru saja lewat 5000/10000/dst
         if new_milestone > old_milestone:
             lives_to_add = new_milestone - old_milestone
             self.lives += lives_to_add
             print(f"GameManager: BONUS LIFE! Score passed {new_milestone * bonus_threshold}. Lives: {self.lives}")
-            # Simpan state agar jumlah nyawa aman jika crash/keluar
             self.save_game() 
             return True
-            
         return False
         
     def load_game(self):
-        """Load saved game"""
         data = self.save_manager.load_game()
         if data:
             self.current_level = data.get('level', 1)
             self.total_score = data.get('score', 0)
             self.lives = data.get('lives', 5)
-            # Pastikan high score tetap sinkron jika save file lama
             self.check_high_score(self.total_score)
             return True
         return False
         
     def save_game(self):
-        """Save current game state"""
         data = {
             'level': self.current_level,
             'score': self.total_score,
@@ -109,13 +106,11 @@ class GameManager:
         self.save_manager.save_game(data)
         
     def level_completed(self, current_total_score):
-        """Handle level completion"""
         self.total_score = current_total_score
         self.check_high_score(self.total_score)
         
         print(f"GameManager: Level {self.current_level} completed. Total Score: {self.total_score}")
         
-        # --- TAMBAHAN: Lapor ke tracker bahwa level selesai ---
         if hasattr(self, 'achievement_tracker') and self.achievement_tracker:
             self.achievement_tracker.on_level_complete(self.current_level)
             
@@ -124,7 +119,6 @@ class GameManager:
         self.save_game()
         
     def level_failed(self):
-        """Handle level failure"""
         print(f"GameManager: Level {self.current_level} failed")
         self.lives -= 1
         print(f"GameManager: Lives remaining: {self.lives}")
@@ -133,12 +127,11 @@ class GameManager:
             print("GameManager: GAME OVER - No lives remaining")
             self.check_high_score(self.total_score)
             
-            # --- TAMBAHAN: Lapor game over ke tracker ---
             if hasattr(self, 'achievement_tracker') and self.achievement_tracker:
                 self.achievement_tracker.on_game_over()
             
             self.save_game()
-            return True  # Game over
+            return True 
         
         self.save_game()
-        return False  # Continue (retry level)
+        return False

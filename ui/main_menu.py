@@ -210,7 +210,67 @@ class MainMenu(QWidget):
             painter.setPen(Qt.NoPen)
             painter.drawEllipse(QRectF(x - size/2, y - size/2, size, size))
         
-    def new_game(self):        
+    def new_game(self):
+        """Start new game with intro videos"""
+        # Play intro videos before starting game
+        self.play_intro_videos()
+        
+    def play_intro_videos(self):
+        """Play start_mode.mp4 then flying.mp4 before game starts"""
+        start_mode_path = "./ancient_gfx/start_mode.mp4"
+        flying_path = "./ancient_gfx/flying.mp4"
+        
+        # First video: start_mode.mp4
+        video_player_1 = VideoPlayer(self)
+        
+        def on_start_mode_finished():
+            print("Intro: start_mode.mp4 finished, playing flying.mp4...")
+            video_player_1.deleteLater()
+            
+            # Second video: flying.mp4
+            video_player_2 = VideoPlayer(self)
+            
+            def on_flying_finished():
+                print("Intro: flying.mp4 finished, starting game...")
+                video_player_2.deleteLater()
+                self.start_game()
+            
+            def on_flying_skipped():
+                print("Intro: flying.mp4 skipped, starting game...")
+                video_player_2.deleteLater()
+                self.start_game()
+            
+            video_player_2.video_finished.connect(on_flying_finished)
+            video_player_2.video_skipped.connect(on_flying_skipped)
+            video_player_2.play_video(flying_path)
+        
+        def on_start_mode_skipped():
+            print("Intro: start_mode.mp4 skipped, playing flying.mp4...")
+            video_player_1.deleteLater()
+            
+            # Skip to second video
+            video_player_2 = VideoPlayer(self)
+            
+            def on_flying_finished():
+                print("Intro: flying.mp4 finished, starting game...")
+                video_player_2.deleteLater()
+                self.start_game()
+            
+            def on_flying_skipped():
+                print("Intro: flying.mp4 skipped, starting game...")
+                video_player_2.deleteLater()
+                self.start_game()
+            
+            video_player_2.video_finished.connect(on_flying_finished)
+            video_player_2.video_skipped.connect(on_flying_skipped)
+            video_player_2.play_video(flying_path)
+        
+        video_player_1.video_finished.connect(on_start_mode_finished)
+        video_player_1.video_skipped.connect(on_start_mode_skipped)
+        video_player_1.play_video(start_mode_path)
+    
+    def start_game(self):
+        """Actually start the game after videos"""
         self.parent_window.game_manager.new_game()
         self.parent_window.state_manager.change_state(GameState.PLAYING)        
         

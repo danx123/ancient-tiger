@@ -3,7 +3,7 @@ Settings dialog interface
 """
 
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
-                                QLabel, QSlider, QCheckBox, QGroupBox)
+                                QLabel, QSlider, QCheckBox, QGroupBox, QMessageBox)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
@@ -42,7 +42,7 @@ class SettingsDialog(QDialog):
                 border: 2px solid #8B4513;
                 border-radius: 5px;
                 margin-top: 10px;
-                padding: 15px;
+                padding: 5px;
                 font-size: 16px;
                 font-weight: bold;
             }
@@ -93,6 +93,7 @@ class SettingsDialog(QDialog):
         self.sfx_slider = QSlider(Qt.Horizontal)
         self.sfx_slider.setMinimum(0)
         self.sfx_slider.setMaximum(100)
+        self.sfx_slider.setContentsMargins(0, 10, 0, 10)        
         self.sfx_slider.setTickPosition(QSlider.TicksBelow)
         self.sfx_slider.setTickInterval(10)
         self.sfx_slider.valueChanged.connect(self.update_sfx_volume_label)
@@ -166,6 +167,49 @@ class SettingsDialog(QDialog):
                 background: #654321;
             }
         """
+
+        # --- DANGER ZONE ---
+        reset_group = QGroupBox("Danger Zone")
+        reset_group.setStyleSheet("""
+            QGroupBox {
+                color: #FFD700;
+                border: 2px solid #8B4513;
+                border-radius: 5px;
+                margin-top: 10px;
+                padding: 15px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+            }
+        """)
+        reset_layout = QVBoxLayout()
+        
+        self.reset_btn = QPushButton("⚠️ RESET ALL GAME DATA")
+        self.reset_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #440000;
+                color: #FF5555;
+                border: 1px solid #FF0000;
+                padding: 8px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #880000;
+                color: white;
+            }
+        """)
+        self.reset_btn.clicked.connect(self.on_factory_reset)
+        reset_layout.addWidget(self.reset_btn)
+        reset_group.setLayout(reset_layout)
+        main_layout.addWidget(reset_group)
+        # ------------------------------------------------
+
+        # Buttons (Save/Cancel)
+        buttons_layout = QHBoxLayout()
         
         save_btn = QPushButton("Save")
         save_btn.setStyleSheet(button_style)
@@ -188,6 +232,40 @@ class SettingsDialog(QDialog):
                                            stop:0 #2C1810, stop:1 #1A0F0A);
             }
         """)
+
+    def on_factory_reset(self):
+        """Logika konfirmasi dan eksekusi reset total"""
+        confirm = QMessageBox(self)
+        confirm.setWindowTitle("Confirm Factory Reset")
+        confirm.setIcon(QMessageBox.Critical)
+        confirm.setText("Are You Sure?")
+        confirm.setInformativeText(
+            "This action will delete:\n"
+            "- All Save Games & Progress\n"
+            "- High Scores & Achievements\n"
+            "- Graphics and Audio Settings\n\n"
+            "The game will close automatically after reset.."
+        )
+        
+        confirm.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        confirm.setDefaultButton(QMessageBox.No)
+        
+        # Styling agar teks terlihat di tema gelap
+        confirm.setStyleSheet("QLabel{ color: black; }") 
+        
+        if confirm.exec() == QMessageBox.Yes:
+            if self.settings_manager.factory_reset():
+                # Beri notifikasi terakhir sebelum exit
+                final_msg = QMessageBox(self)
+                final_msg.setText("Data berhasil dihapus. Silakan buka kembali game Anda.")
+                final_msg.setStyleSheet("QLabel{ color: black; }")
+                final_msg.exec()
+                
+                # Keluar dari aplikasi agar folder benar-benar bersih saat dibuka lagi
+                import sys
+                sys.exit(0)
+            else:
+                QMessageBox.warning(self, "Error", "Gagal menghapus data. Pastikan tidak ada file yang sedang terbuka.")
         
     def load_settings(self):
         """Load current settings"""

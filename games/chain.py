@@ -18,26 +18,49 @@ class OrbChain:
         # Cap level at 50
         self.level = min(level, 50)
         
-        # Speed scaling with diminishing returns after level 30
-        if self.level <= 30:
-            self.speed = 12 + self.level * 2
+        # TUNED: Speed scaling with better progression
+        # Level 1-10: Gradual increase (beginner friendly)
+        # Level 11-25: Moderate increase (intermediate)
+        # Level 26-40: Slower increase (expert)
+        # Level 41-50: Minimal increase (master)
+        if self.level <= 10:
+            # Base speed 12, increase 1.5 per level
+            # Level 1: 13.5, Level 10: 27
+            self.speed = 12 + self.level * 1.5
+        elif self.level <= 25:
+            # Continue from level 10 (27), increase 1.2 per level
+            # Level 11: 28.2, Level 25: 46.2
+            base = 12 + 10 * 1.5
+            self.speed = base + (self.level - 10) * 1.2
+        elif self.level <= 40:
+            # Continue from level 25 (46.2), increase 0.8 per level
+            # Level 26: 47, Level 40: 59
+            base = 12 + 10 * 1.5 + 15 * 1.2
+            self.speed = base + (self.level - 25) * 0.8
         else:
-            # Slower increase after level 30
-            self.speed = 12 + 30 * 2 + (self.level - 30) * 1
+            # Continue from level 40 (59), increase 0.5 per level
+            # Level 41: 59.5, Level 50: 64
+            base = 12 + 10 * 1.5 + 15 * 1.2 + 15 * 0.8
+            self.speed = base + (self.level - 40) * 0.5
         
         # Spawn timer initialization
         self.spawn_timer = 0
         
-        # Spawn interval with harder scaling
-        if self.level <= 20:
+        # TUNED: Spawn interval with smoother scaling
+        if self.level <= 10:
+            # Level 1: 2.5s, Level 10: 1.7s
             self.spawn_interval = 2.5 - (self.level * 0.08)
+        elif self.level <= 20:
+            # Level 11: 1.65s, Level 20: 1.15s
+            self.spawn_interval = 1.7 - ((self.level - 10) * 0.05)
         elif self.level <= 35:
-            self.spawn_interval = 0.9 - ((self.level - 20) * 0.02)
+            # Level 21: 1.12s, Level 35: 0.82s
+            self.spawn_interval = 1.15 - ((self.level - 20) * 0.02)
         else:
-            # Minimum spawn interval for extreme difficulty
-            self.spawn_interval = 0.6
+            # Level 36+: Cap at 0.7s (not too crazy)
+            self.spawn_interval = 0.7
         
-        self.spawn_interval = max(self.spawn_interval, 0.5)
+        self.spawn_interval = max(self.spawn_interval, 0.6)
         self.distance_between_orbs = 34
         self.frozen = False
         self.freeze_timer = 0
@@ -53,6 +76,9 @@ class OrbChain:
         
         # Spawn initial orbs
         self._spawn_initial_orbs()
+        
+        # Debug print untuk cek speed
+        print(f"Level {self.level}: Speed={self.speed:.1f}, Spawn Interval={self.spawn_interval:.2f}s")
         
     def _calculate_max_orbs(self, level):
         if level == 1: return 15
