@@ -124,8 +124,43 @@ class AppWindow(QMainWindow):
         self.pause_menu.show_overlay()
         
     def show_game_over(self):
-        """Handle game over"""
-        QTimer.singleShot(2000, lambda: self.state_manager.change_state(GameState.MAIN_MENU))
+        """Handle game over - Play video then go to menu"""
+        # Play the ending video, then callback to Main Menu
+        self.show_game_over_video(lambda: self.state_manager.change_state(GameState.MAIN_MENU))
+        
+    def show_game_over_video(self, callback=None):
+        """Show ending video on game over"""
+        video_path = "./ancient_gfx/ending.mp4"
+        print(f"AppWindow: Attempting to play ending video from {video_path}")
+        
+        # Create video player instance
+        video_player = VideoPlayer(self)
+        
+        def on_video_finish():
+            print("AppWindow: Ending video finished")
+            video_player.close()
+            video_player.deleteLater()
+            if callback:
+                # Small delay to ensure clean UI transition
+                QTimer.singleShot(100, callback)
+        
+        def on_video_skip():
+            print("AppWindow: Ending video skipped")
+            video_player.close()
+            video_player.deleteLater()
+            if callback:
+                QTimer.singleShot(100, callback)
+        
+        # Connect signals
+        video_player.video_finished.connect(on_video_finish)
+        video_player.video_skipped.connect(on_video_skip)
+        
+        # Check if file exists to avoid hanging, though VideoPlayer might handle it
+        if os.path.exists(video_path):
+            video_player.play_video(video_path)
+        else:
+            print(f"AppWindow: Ending video not found at {video_path}")
+            on_video_finish() # Skip directly to callback if video missing
         
     def keyPressEvent(self, event):
         """Handle global key events"""
