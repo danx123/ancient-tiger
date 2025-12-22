@@ -1,5 +1,5 @@
 ANCIENT TIGER: THE BLACK HOLE ESCAPE
-Version 5.0.0
+Version 5.4.0
 
 ABOUT THE GAME
 Ancient Tiger: The Black Hole Escape is a mystical puzzle game
@@ -108,4 +108,5 @@ Thank you for playing!
 May the Ancient Tiger guide your path.
 
 🐯
+
 
