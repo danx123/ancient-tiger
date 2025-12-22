@@ -271,6 +271,24 @@ class GameScene(QWidget):
 
         self.parent_window.game_manager.level_completed(self.score)
         self._show_level_complete_message()
+        # --- LOGIKA BARU UNTUK LEVEL 50 ---
+        if self.level == 50:
+            print("GameScene: Level 50 Complete! Triggering Victory Sequence.")
+            
+            def show_victory_sequence():
+                def return_to_menu():
+                    # Kembali ke Main Menu setelah video selesai
+                    self.parent_window.state_manager.change_state(GameState.MAIN_MENU)
+                
+                # Panggil fungsi video di AppWindow
+                self.parent_window.show_victory_video(return_to_menu)
+            
+            # Beri jeda 2 detik agar tulisan "LEVEL COMPLETE" terbaca dulu
+            QTimer.singleShot(2000, show_victory_sequence)
+            return
+        # ----------------------------------
+
+        # Logika standar (Level < 50)
         next_level = self.parent_window.game_manager.current_level
         
         def show_transition_video():

@@ -161,6 +161,36 @@ class AppWindow(QMainWindow):
         else:
             print(f"AppWindow: Ending video not found at {video_path}")
             on_video_finish() # Skip directly to callback if video missing
+
+    def show_victory_video(self, callback=None):
+        """Show victory video when finishing level 50"""
+        video_path = "./ancient_gfx/victory.mp4"
+        print(f"AppWindow: Attempting to play victory video from {video_path}")
+        
+        video_player = VideoPlayer(self)
+        
+        def on_video_finish():
+            print("AppWindow: Victory video finished")
+            video_player.close()
+            video_player.deleteLater()
+            if callback:
+                QTimer.singleShot(100, callback)
+        
+        def on_video_skip():
+            print("AppWindow: Victory video skipped")
+            video_player.close()
+            video_player.deleteLater()
+            if callback:
+                QTimer.singleShot(100, callback)
+        
+        video_player.video_finished.connect(on_video_finish)
+        video_player.video_skipped.connect(on_video_skip)
+        
+        if os.path.exists(video_path):
+            video_player.play_video(video_path)
+        else:
+            print(f"AppWindow: Victory video not found at {video_path}")
+            on_video_finish()
         
     def keyPressEvent(self, event):
         """Handle global key events"""
