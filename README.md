@@ -33,6 +33,12 @@ Journey through ancient temples, destroying chains of magical orbs before they r
 
 ---
 
+
+https://github.com/user-attachments/assets/e81b89c0-e765-412c-82ae-31e40892b61c
+
+
+
+
 ## ✨ Features
 
 ### Core Gameplay
