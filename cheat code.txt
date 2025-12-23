@@ -1,0 +1,51 @@
+📋 Daftar Cheat Codes (36 Cheats Total):
+Lives & Health (3)
+GODMODE - Infinite lives
+MORELIVES - Add 5 lives
+MAXLIVES - Set lives to 99
+Score (3)
+RICHMAN - Add 10,000 points
+MILLIONAIRE - Add 100,000 points
+HIGHSCORE - Set score to 999,999
+Level (4)
+SKIPTHIS - Skip current level
+LEVELUP - Go to next level
+GOTOLEVEL <number> - Jump to specific level (e.g., GOTOLEVEL 25)
+FINALLEVEL - Jump to level 50
+Game Speed (4)
+SLOWMO - Slow motion mode (0.5x)
+TURBO - Turbo mode (2x speed)
+NORMALSPEED - Reset to normal
+FREEZEORBS - Freeze chain for 30 seconds
+Power-ups (3)
+POWERUP - Spawn random powerup
+ALLPOWER - Activate all powerups
+BOMBRAIN - Spawn 10 bombs
+Orbs (3)
+CLEARORBS - Clear all orbs instantly
+RAINBOW - All orbs become rainbow
+NOSPAWN - Stop orb spawning
+Achievement (3)
+UNLOCKALL - Unlock all achievements
+RESETACH - Reset achievements
+GIVEACH <id> - Unlock specific achievement
+Debug (3)
+SHOWFPS - Toggle FPS counter
+SHOWPATH - Show full path visualization
+NOCLIP - Orbs can't reach portal
+Fun (3)
+PARTY - Party mode (rainbow effects)
+BIGHEAD - Make orbs huge
+TINY - Make orbs tiny
+Secret (3)
+KONAMI - ??? (Easter egg)
+DEVELOPER - Unlock developer achievement
+Console Commands:
+HELP - Show all cheats
+CLEAR - Clear console
+EXIT / QUIT - Close console
+🎯 Cara Pakai:
+Buka Console: Tekan tombol ~ (tilde, di bawah ESC)
+Ketik Cheat: Misal GODMODE atau GOTOLEVEL 25
+Enter: Tekan Enter untuk execute
+Tutup: Tekan ~ atau ESC lagi
