@@ -556,6 +556,4 @@ SOFTWARE.
 
 ⭐ Star this repo if you enjoy the game!
 
-[Back to Top](#-ancient-tiger---temple-of-the-orbs)
-
 </div>
