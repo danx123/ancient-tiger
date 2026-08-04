@@ -23,6 +23,13 @@ class AppWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Ancient Tiger")
         self.setMinimumSize(1024, 768)
+        
+        # Menghapus border window dari OS (mematikan bayangan / kaca DWM)
+        # dan mereset margin agar benar-benar full screen edge-to-edge
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
+        self.setContentsMargins(0, 0, 0, 0)
+        # ==========================
+        
         icon_path = "orb.ico"
         if hasattr(sys, "_MEIPASS"):
             icon_path = os.path.join(sys._MEIPASS, icon_path)
@@ -45,7 +52,11 @@ class AppWindow(QMainWindow):
         
         # Setup UI
         self.stack = QStackedWidget()
-        self.setCentralWidget(self.stack)
+        # Hilangkan margin di QStackedWidget
+        self.stack.setContentsMargins(0, 0, 0, 0)
+        # ==========================
+        self.setCentralWidget(self.stack)       
+        
         
         # Create screens
         self.main_menu = MainMenu(self)
