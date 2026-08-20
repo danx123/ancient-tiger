@@ -1,0 +1,4 @@
+Metadata-Version: 2.4
+Name: zuma_core
+Version: 0.1.0
+Summary: Rust math/physics core for Macan Zuma-style orb game (PyO3 extension)
