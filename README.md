@@ -1,5 +1,10 @@
 # 🐯 Ancient Tiger - The Black Hole Escape
 
+![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square)
+![Rust](https://img.shields.io/badge/native%20engine-Rust-orange?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
+![Total Downloads](https://img.shields.io/github/downloads/danx123/ancient-tiger/total?style=flat-square&color=E8FF00&label=downloads)
+
 <div align="center">
 <img width="2044" height="1150" alt="ancient-tiger" src="https://github.com/user-attachments/assets/10f7702d-750f-4ae9-a7ea-1b36b6dd93c2" />
 
